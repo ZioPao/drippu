@@ -11,9 +11,6 @@ on:
         required: true
         default: v0.0.5
         type: string
-  push:
-    branches: 
-      - fix-ci-linux
 
 permissions:
   contents: write
