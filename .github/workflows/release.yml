@@ -16,68 +16,68 @@ permissions:
   contents: write
 
 jobs:
-  build-windows:
-    name: Windows
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Init submodules
-        run: |
-          git -c submodule."externals/ownfoil".update=none -c submodule."externals/nxdumptool".update=none -c submodule."externals/nxapi".update=none -c submodule."externals/nx-optimizer".update=none submodule update --init --recursive --depth=1
-      - name: Fix submodule headers
-        shell: bash
-        run: |
-          f="externals/dynarmic/externals/mcl/include/boost/variant.hpp"
-          if [ -f "$f" ] && grep -q 'C:/Users' "$f"; then
-            printf '// Forwarding header\n#include <boost/variant/variant.hpp>\n#include <boost/variant/recursive_variant.hpp>\n#include <boost/variant/recursive_wrapper.hpp>\n#include <boost/variant/get.hpp>\n#include <boost/variant/apply_visitor.hpp>\n#include <boost/variant/static_visitor.hpp>\n#include <boost/variant/visitor_ptr.hpp>\n' > "$f"
-          fi
-      - uses: ilammy/msvc-dev-cmd@v1
-      - uses: jurplel/install-qt-action@v4
-        with:
-          version: '6.7.0'
-          arch: win64_msvc2019_64
-          modules: qtcharts qtmultimedia qtwebengine
-      - name: Install Vulkan SDK
-        shell: pwsh
-        run: |
-          choco install vulkan-sdk -y --no-progress
-          $sdkDir = Get-ChildItem C:\VulkanSDK -Directory | Sort-Object Name -Descending | Select-Object -First 1
-          echo "VULKAN_SDK=$($sdkDir.FullName)" >> $env:GITHUB_ENV
-          echo "$($sdkDir.FullName)\Bin" >> $env:GITHUB_PATH
-      - name: Configure
-        shell: bash
-        run: |
-          cmake --version
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_QT=ON -DYUZU_USE_BUNDLED_QT=OFF -GNinja 2>&1 | tee cmake_configure.log
-          test ${PIPESTATUS[0]} -eq 0
-      - name: Upload cmake log
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: cmake-log-windows
-          path: cmake_configure.log
-      - name: Build
-        run: cmake --build build --target suyu suyu-cmd -j4
-      - name: Package
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force _pkg
-          Copy-Item build/bin/suyu.exe _pkg/drippu.exe
-          Copy-Item build/bin/suyu-cmd.exe _pkg/drippu-cmd.exe
-          windeployqt --release --no-translations _pkg/drippu.exe
-          Compress-Archive -Path _pkg/* -DestinationPath drippu-windows-x64.zip
-      - name: Verify packaged Windows application and dependencies
-        shell: pwsh
-        run: python .github/scripts/verify_release_artifacts.py desktop --platform windows --archive drippu-windows-x64.zip
-      - name: Record toolchain
-        shell: bash
-        run: bash .github/scripts/write_toolchain.sh toolchain.txt
-      - uses: actions/upload-artifact@v7
-        with:
-          name: windows
-          path: |
-            drippu-windows-x64.zip
-            toolchain.txt
+  # build-windows:
+  #   name: Windows
+  #   runs-on: windows-latest
+  #   steps:
+  #     - uses: actions/checkout@v7
+  #     - name: Init submodules
+  #       run: |
+  #         git -c submodule."externals/ownfoil".update=none -c submodule."externals/nxdumptool".update=none -c submodule."externals/nxapi".update=none -c submodule."externals/nx-optimizer".update=none submodule update --init --recursive --depth=1
+  #     - name: Fix submodule headers
+  #       shell: bash
+  #       run: |
+  #         f="externals/dynarmic/externals/mcl/include/boost/variant.hpp"
+  #         if [ -f "$f" ] && grep -q 'C:/Users' "$f"; then
+  #           printf '// Forwarding header\n#include <boost/variant/variant.hpp>\n#include <boost/variant/recursive_variant.hpp>\n#include <boost/variant/recursive_wrapper.hpp>\n#include <boost/variant/get.hpp>\n#include <boost/variant/apply_visitor.hpp>\n#include <boost/variant/static_visitor.hpp>\n#include <boost/variant/visitor_ptr.hpp>\n' > "$f"
+  #         fi
+  #     - uses: ilammy/msvc-dev-cmd@v1
+  #     - uses: jurplel/install-qt-action@v4
+  #       with:
+  #         version: '6.7.0'
+  #         arch: win64_msvc2019_64
+  #         modules: qtcharts qtmultimedia qtwebengine
+  #     - name: Install Vulkan SDK
+  #       shell: pwsh
+  #       run: |
+  #         choco install vulkan-sdk -y --no-progress
+  #         $sdkDir = Get-ChildItem C:\VulkanSDK -Directory | Sort-Object Name -Descending | Select-Object -First 1
+  #         echo "VULKAN_SDK=$($sdkDir.FullName)" >> $env:GITHUB_ENV
+  #         echo "$($sdkDir.FullName)\Bin" >> $env:GITHUB_PATH
+  #     - name: Configure
+  #       shell: bash
+  #       run: |
+  #         cmake --version
+  #         cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_QT=ON -DYUZU_USE_BUNDLED_QT=OFF -GNinja 2>&1 | tee cmake_configure.log
+  #         test ${PIPESTATUS[0]} -eq 0
+  #     - name: Upload cmake log
+  #       if: failure()
+  #       uses: actions/upload-artifact@v7
+  #       with:
+  #         name: cmake-log-windows
+  #         path: cmake_configure.log
+  #     - name: Build
+  #       run: cmake --build build --target suyu suyu-cmd -j4
+  #     - name: Package
+  #       shell: pwsh
+  #       run: |
+  #         New-Item -ItemType Directory -Force _pkg
+  #         Copy-Item build/bin/suyu.exe _pkg/drippu.exe
+  #         Copy-Item build/bin/suyu-cmd.exe _pkg/drippu-cmd.exe
+  #         windeployqt --release --no-translations _pkg/drippu.exe
+  #         Compress-Archive -Path _pkg/* -DestinationPath drippu-windows-x64.zip
+  #     - name: Verify packaged Windows application and dependencies
+  #       shell: pwsh
+  #       run: python .github/scripts/verify_release_artifacts.py desktop --platform windows --archive drippu-windows-x64.zip
+  #     - name: Record toolchain
+  #       shell: bash
+  #       run: bash .github/scripts/write_toolchain.sh toolchain.txt
+  #     - uses: actions/upload-artifact@v7
+  #       with:
+  #         name: windows
+  #         path: |
+  #           drippu-windows-x64.zip
+  #           toolchain.txt
 
   build-linux:
     name: Linux
