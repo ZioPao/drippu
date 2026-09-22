@@ -96,7 +96,7 @@ jobs:
       - name: Install deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build glslang-tools \
+          sudo apt-get install -y ninja-build glslang-tools patchelf \
             qt6-base-dev qt6-base-private-dev \
             qt6-multimedia-dev qt6-tools-dev qt6-svg-dev qt6-webengine-dev \
             qt6-charts-dev \
@@ -123,9 +123,45 @@ jobs:
         run: cmake --build build --target suyu suyu-cmd -j4
       - name: Package
         run: |
-          rm -rf _pkg && mkdir _pkg
+          set -euo pipefail
+          rm -rf _pkg && mkdir -p _pkg/lib
           cp build/bin/suyu _pkg/drippu
           cp build/bin/suyu-cmd _pkg/drippu-cmd 2>/dev/null || true
+    
+          declare -A seen
+          collect_deps() {
+            ldd "$1" 2>/dev/null | awk '{print $3}' | grep -E '^/'
+          }
+
+          bundle_recursive() {
+            local queue
+            queue=$(collect_deps "$1")
+            while [ -n "$queue" ]; do
+              local next=""
+              for lib in $queue; do
+                local name
+                name=$(basename "$lib")
+                if [[ -z "${seen[$name]:-}" ]] && ! echo "$name" | grep -qE "$EXCLUDE_REGEX"; then
+                  seen[$name]=1
+                  cp -v "$lib" _pkg/lib/
+                  next="$next $(collect_deps "$lib")"
+                fi
+              done
+              queue="$next"
+            done
+          }
+
+          bundle_recursive _pkg/drippu
+          [ -f _pkg/drippu-cmd ] && bundle_recursive _pkg/drippu-cmd
+
+          echo "Bundled libraries:"
+          ls -la _pkg/lib
+
+          # --- Point the binaries at the bundled libs directory via RPATH so no
+          # wrapper script or LD_LIBRARY_PATH is needed at runtime.
+          patchelf --set-rpath '$ORIGIN/lib' _pkg/drippu
+          [ -f _pkg/drippu-cmd ] && patchelf --set-rpath '$ORIGIN/lib' _pkg/drippu-cmd
+
           tar -czf drippu-linux-x64.tar.gz -C _pkg .
       - name: Verify packaged Linux application and dependencies
         run: python3 .github/scripts/verify_release_artifacts.py desktop --platform linux --archive drippu-linux-x64.tar.gz
