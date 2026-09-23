@@ -33,10 +33,10 @@ if [ "${#files[@]}" -eq 0 ]; then
 fi
 
 required=(
-  drippu-linux-x64.tar.gz
   drippu-linux-x86_64.AppImage
-  drippu-macos-arm64.tar.gz
-  #drippu-windows-x64.zip
+  # drippu-linux-x64.tar.gz
+  # drippu-macos-arm64.tar.gz
+  # drippu-windows-x64.zip
   # drippu-freebsd-x64.tar.gz
   # drippu-libretro-core-linux-x64.tar.gz
   # drippu-libretro-core-windows-x64.zip

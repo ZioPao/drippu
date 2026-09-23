@@ -5,11 +5,11 @@
 # Build a self-contained AppImage from a packaged Linux payload.
 #
 # Usage: package_appimage.sh [input] [output]
-#   input   payload directory (default: _pkg) or a .tar.gz to extract
+#   input   build directory (default: build), a payload directory, or a .tar.gz
 #   output  AppImage to write (default: drippu-linux-x86_64.AppImage)
 set -euo pipefail
 
-input="${1:-_pkg}"
+input="${1:-build}"
 output="${2:-drippu-linux-x86_64.AppImage}"
 
 appimagetool_version="1.9.1"
@@ -18,8 +18,13 @@ appimagetool_url="https://github.com/AppImage/appimagetool/releases/download/${a
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 appdir="$repo_root/AppDir"
 
-# Assemble the AppDir. Hardlink-copy so the payload used for the tarball stays
-# untouched, and fall back to a real copy if hardlinks are unavailable.
+if [ -d "$input" ] && [ -f "$input/bin/suyu" ]; then
+  tmp_archive="$(mktemp --suffix=.tar.gz)"
+  bash "$repo_root/.github/scripts/package_linux.sh" "$input" "$tmp_archive"
+  rm -f "$tmp_archive"
+  input="$PWD/_pkg"
+fi
+
 rm -rf "$appdir"
 if [[ "$input" == *.tar.gz ]]; then
   mkdir -p "$appdir"

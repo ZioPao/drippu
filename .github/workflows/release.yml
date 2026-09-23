@@ -117,26 +117,28 @@ jobs:
           path: cmake_configure.log
       - name: Build
         run: cmake --build build --target suyu suyu-cmd -j"$(nproc)"
-      - name: Package
-        run: bash .github/scripts/package_linux.sh
+      # - name: Package
+      #   run: bash .github/scripts/package_linux.sh
       - name: Package AppImage
         run: bash .github/scripts/package_appimage.sh
-      - name: Verify packaged Linux application and dependencies
-        run: python3 .github/scripts/verify_release_artifacts.py desktop --platform linux --archive drippu-linux-x64.tar.gz
+      # - name: Verify packaged Linux application and dependencies
+      #   run: python3 .github/scripts/verify_release_artifacts.py desktop --platform linux --archive drippu-linux-x64.tar.gz
       - name: Verify packaged Linux AppImage
         run: python3 .github/scripts/verify_release_artifacts.py desktop --platform linux --archive drippu-linux-x86_64.AppImage
       - name: Record toolchain
         run: bash .github/scripts/write_toolchain.sh toolchain.txt
-      - uses: actions/upload-artifact@v7
-        with:
-          name: linux
-          path: |
-            drippu-linux-x64.tar.gz
-            toolchain.txt
+      # - uses: actions/upload-artifact@v7
+      #   with:
+      #     name: linux
+      #     path: |
+      #       drippu-linux-x64.tar.gz
+      #       toolchain.txt
       - uses: actions/upload-artifact@v7
         with:
           name: linux-appimage
-          path: drippu-linux-x86_64.AppImage
+          path: |
+            drippu-linux-x86_64.AppImage
+            toolchain.txt
   # build-macos:
   #   name: macOS
   #   runs-on: macos-15
