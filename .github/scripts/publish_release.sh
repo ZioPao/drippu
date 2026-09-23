@@ -26,24 +26,25 @@ fi
 files=()
 while IFS= read -r file; do
   files+=("$file")
-done < <(find "$artifacts_dir" -type f \( -name '*.zip' -o -name '*.tar.gz' -o -name '*.apk' \) | sort)
+done < <(find "$artifacts_dir" -type f \( -name '*.zip' -o -name '*.tar.gz' -o -name '*.apk' -o -name '*.AppImage' \) | sort)
 if [ "${#files[@]}" -eq 0 ]; then
   echo "No artifacts to release"
   exit 1
 fi
 
 required=(
-  drippu-windows-x64.zip
-  drippu-linux-x64.tar.gz
-  drippu-macos-arm64.tar.gz
-  drippu-freebsd-x64.tar.gz
-  drippu-libretro-core-linux-x64.tar.gz
-  drippu-libretro-core-windows-x64.zip
-  drippu-libretro-core-android-arm64.tar.gz
-  app-legacy-release.apk
-  app-mainline-release.apk
-  app-chromeOS-release.apk
-  app-genshinSpoof-release.apk
+  drippu-linux-x86_64.AppImage
+  # drippu-linux-x64.tar.gz
+  # drippu-macos-arm64.tar.gz
+  # drippu-windows-x64.zip
+  # drippu-freebsd-x64.tar.gz
+  # drippu-libretro-core-linux-x64.tar.gz
+  # drippu-libretro-core-windows-x64.zip
+  # drippu-libretro-core-android-arm64.tar.gz
+  # app-legacy-release.apk
+  # app-mainline-release.apk
+  # app-chromeOS-release.apk
+  # app-genshinSpoof-release.apk
 )
 
 artifact_names=()
@@ -84,6 +85,7 @@ friendly_platform() {
   case "$1" in
     drippu-windows-x64.zip) echo 'Windows x64' ;;
     drippu-linux-x64.tar.gz) echo 'Linux x64' ;;
+    drippu-linux-x86_64.AppImage) echo 'Linux x86_64 (AppImage)' ;;
     drippu-macos-arm64.tar.gz) echo 'macOS Apple Silicon' ;;
     drippu-freebsd-x64.tar.gz) echo 'FreeBSD x64' ;;
     drippu-libretro-core-linux-x64.tar.gz) echo 'Libretro core (Linux x64)' ;;
