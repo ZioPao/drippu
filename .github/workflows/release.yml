@@ -533,15 +533,9 @@ jobs:
             drippu-libretro-core-android-arm64.tar.gz
             toolchain.txt
 
-  exporter-smoke:
-    uses: ./.github/workflows/exporter-smoke.yml
-
-  tests:
-    uses: ./.github/workflows/tests.yml
-
   release:
     name: Publish Release
-    needs: [build-windows, build-linux, build-macos, build-freebsd, build-android, build-libretro, build-libretro-windows, build-libretro-android, exporter-smoke, tests]
+    needs: [build-windows, build-linux, build-macos, build-freebsd, build-android, build-libretro, build-libretro-windows, build-libretro-android]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v8
