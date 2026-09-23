@@ -122,7 +122,7 @@ jobs:
           path: cmake_configure.log
       - name: Build
         run: cmake --build build --target suyu suyu-cmd -j4
-        
+
       - name: Package
         run: |
           set -euo pipefail
@@ -131,10 +131,11 @@ jobs:
           cp build/bin/suyu-cmd _pkg/drippu-cmd 2>/dev/null || true
 
           EXCLUDE_REGEX='^(linux-vdso|ld-linux|libc\.so|libm\.so|libpthread\.so|libdl\.so|librt\.so|libresolv\.so|libnsl\.so|libutil\.so|libgcc_s\.so|libstdc\+\+\.so|libGL\.so|libGLX\.so|libGLdispatch\.so|libEGL\.so|libvulkan\.so|libX11\.so|libXext\.so|libXrandr\.so|libXcursor\.so|libXi\.so|libXfixes\.so|libxcb\.|libwayland-|libdrm\.so|libgbm\.so)'
+          : "${EXCLUDE_REGEX:?EXCLUDE_REGEX must be set}"
 
           declare -A seen
           collect_deps() {
-            ldd "$1" 2>/dev/null | awk '{print $3}' | grep -E '^/'
+            ldd "$1" 2>/dev/null | awk '{print $3}' | grep -E '^/' || true
           }
 
           bundle_recursive() {
