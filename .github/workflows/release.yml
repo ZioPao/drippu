@@ -80,6 +80,7 @@ jobs:
   #           drippu-windows-x64.zip
   #           toolchain.txt
 
+  # TODO Replace this crap with a AppImage.
   build-linux:
     name: Linux
     runs-on: ubuntu-24.04
@@ -98,7 +99,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ninja-build glslang-tools patchelf \
-            qt6-base-dev qt6-base-dev-tools qt6-base-private-dev \
+            qt6-base-dev qt6-base-dev-tools qt6-base-private-dev qt6-qpa-plugins \
             qt6-multimedia-dev qt6-tools-dev qt6-svg-dev qt6-webengine-dev \
             qt6-charts-dev \
             libssl-dev libusb-1.0-0-dev libpulse-dev \
@@ -166,6 +167,7 @@ jobs:
           # so ldd never sees them - this is a separate discovery mechanism from the
           # block above and must be handled independently.
           QXCB=$(dpkg -L qt6-qpa-plugins | grep 'platforms/libqxcb.so$')
+          : "${QXCB:?libqxcb.so not found — is qt6-qpa-plugins installed?}"
           mkdir -p _pkg/plugins/platforms
           cp "$QXCB" _pkg/plugins/platforms/
 
