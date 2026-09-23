@@ -541,7 +541,7 @@ jobs:
 
   release:
     name: Publish Release
-    needs: [build-linux]
+    needs: [build-windows, build-linux, build-macos, build-freebsd, build-android, build-libretro, build-libretro-windows, build-libretro-android, exporter-smoke, tests]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v8
@@ -561,4 +561,8 @@ jobs:
           prerelease: true
           generate_release_notes: true
           fail_on_unmatched_files: true
-          files: artifacts/**/*.AppImage
+          files: |
+            artifacts/**/*.zip
+            artifacts/**/*.tar.gz
+            artifacts/**/*.apk
+            artifacts/**/*.AppImage
