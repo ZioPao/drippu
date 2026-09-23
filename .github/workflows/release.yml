@@ -98,7 +98,7 @@ jobs:
       - name: Install deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build glslang-tools patchelf \
+          sudo apt-get install -y ninja-build glslang-tools patchelf ccache \
             qt6-base-dev qt6-base-dev-tools qt6-base-private-dev qt6-qpa-plugins \
             qt6-multimedia-dev qt6-tools-dev qt6-svg-dev qt6-webengine-dev \
             qt6-charts-dev \
@@ -110,11 +110,20 @@ jobs:
             libegl-dev libdrm-dev libgbm-dev \
             libavcodec-dev libavfilter-dev libavutil-dev libswscale-dev \
             libboost-all-dev
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ${{ runner.os }}-ccache-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-
+      - name: Configure ccache
+        run: ccache --max-size=6G --zero-stats
       - name: Configure
         run: |
           cmake --version
           set -o pipefail
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_QT=ON -DYUZU_USE_BUNDLED_QT=OFF -GNinja -DOPENSSL_ROOT_DIR=/usr 2>&1 | tee cmake_configure.log
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_QT=ON -DYUZU_USE_BUNDLED_QT=OFF -DUSE_CCACHE=ON -GNinja -DOPENSSL_ROOT_DIR=/usr 2>&1 | tee cmake_configure.log
       - name: Upload cmake log
         if: failure()
         uses: actions/upload-artifact@v7
@@ -123,6 +132,9 @@ jobs:
           path: cmake_configure.log
       - name: Build
         run: cmake --build build --target suyu suyu-cmd -j4
+      - name: ccache stats
+        if: always()
+        run: ccache --show-stats
       - name: Package
         run: |
           set -euo pipefail
@@ -163,15 +175,27 @@ jobs:
           echo "Bundled libraries:"
           ls -la _pkg/lib
 
-          # --- Bundle Qt platform plugins. These are dlopen'd at runtime, not linked,
-          # so ldd never sees them - this is a separate discovery mechanism from the
-          # block above and must be handled independently.
-          QXCB=$(dpkg -L qt6-qpa-plugins | grep 'platforms/libqxcb.so$')
-          : "${QXCB:?libqxcb.so not found — is qt6-qpa-plugins installed?}"
-          mkdir -p _pkg/plugins/platforms
-          cp "$QXCB" _pkg/plugins/platforms/
+          # --- Bundle Qt plugins. These are dlopen'd at runtime, not linked, so
+          # ldd never sees them - this is a separate discovery mechanism from the
+          # block above and must be handled independently. Discover the plugin
+          # directory at runtime: on Ubuntu 24.04 libqxcb.so ships in libqt6gui6t64
+          # while the remaining QPA plugins live in qt6-qpa-plugins, so hardcoding
+          # a package name is not reliable.
+          QT_PLUGINS_DIR="$(qtpaths6 --plugin-dir 2>/dev/null || true)"
+          if [ -z "${QT_PLUGINS_DIR:-}" ] || [ ! -d "$QT_PLUGINS_DIR/platforms" ]; then
+            QT_PLUGINS_DIR="$(dirname "$(find /usr/lib -type f -path '*/qt6/plugins/platforms/libqxcb.so' -print -quit)")/.."
+          fi
+          : "${QT_PLUGINS_DIR:?Qt plugin directory not found}"
+          test -d "$QT_PLUGINS_DIR/platforms"
 
-          for p in _pkg/plugins/platforms/*.so; do
+          mkdir -p _pkg/plugins/platforms _pkg/plugins/xcbglintegrations
+          cp -v "$QT_PLUGINS_DIR"/platforms/*.so _pkg/plugins/platforms/
+          if [ -d "$QT_PLUGINS_DIR/xcbglintegrations" ]; then
+            cp -v "$QT_PLUGINS_DIR"/xcbglintegrations/*.so _pkg/plugins/xcbglintegrations/
+          fi
+
+          for p in _pkg/plugins/platforms/*.so _pkg/plugins/xcbglintegrations/*.so; do
+            [ -e "$p" ] || continue
             bundle_recursive "$p"
           done
 
@@ -192,7 +216,8 @@ jobs:
             patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true
           done
 
-          for p in _pkg/plugins/platforms/*.so; do
+          for p in _pkg/plugins/platforms/*.so _pkg/plugins/xcbglintegrations/*.so; do
+            [ -e "$p" ] || continue
             patchelf --set-rpath '$ORIGIN/../../lib' "$p" 2>/dev/null || true
           done
 
