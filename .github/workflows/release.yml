@@ -25,13 +25,6 @@ jobs:
       - name: Init submodules
         run: |
           git -c submodule."externals/ownfoil".update=none -c submodule."externals/nxdumptool".update=none -c submodule."externals/nxapi".update=none -c submodule."externals/nx-optimizer".update=none submodule update --init --recursive --depth=1
-      - name: Fix submodule headers
-        shell: bash
-        run: |
-          f="externals/dynarmic/externals/mcl/include/boost/variant.hpp"
-          if [ -f "$f" ] && grep -q 'C:/Users' "$f"; then
-            printf '// Forwarding header\n#include <boost/variant/variant.hpp>\n#include <boost/variant/recursive_variant.hpp>\n#include <boost/variant/recursive_wrapper.hpp>\n#include <boost/variant/get.hpp>\n#include <boost/variant/apply_visitor.hpp>\n#include <boost/variant/static_visitor.hpp>\n#include <boost/variant/visitor_ptr.hpp>\n' > "$f"
-          fi
       - uses: ilammy/msvc-dev-cmd@v1
       - uses: jurplel/install-qt-action@v4
         with:
@@ -93,15 +86,6 @@ jobs:
         with:
           submodules: recursive
 
-      # TODO Confirm this is needed
-      - name: Fix submodule headers
-        run: |
-          set -euo pipefail
-          f="externals/dynarmic/externals/mcl/include/boost/variant.hpp"
-          if [ -f "$f" ] && grep -q 'C:/Users' "$f"; then
-            printf '// Forwarding header\n#include <boost/variant/variant.hpp>\n#include <boost/variant/recursive_variant.hpp>\n#include <boost/variant/recursive_wrapper.hpp>\n#include <boost/variant/get.hpp>\n#include <boost/variant/apply_visitor.hpp>\n#include <boost/variant/static_visitor.hpp>\n#include <boost/variant/visitor_ptr.hpp>\n' > "$f"
-          fi
-
       - name: Install deps
         run: bash .github/scripts/install-linux-deps.sh
       - name: ccache
@@ -142,12 +126,6 @@ jobs:
       - name: Init submodules
         run: |
           git -c submodule."externals/ownfoil".update=none -c submodule."externals/nxdumptool".update=none -c submodule."externals/nxapi".update=none -c submodule."externals/nx-optimizer".update=none submodule update --init --recursive --depth=1
-      - name: Fix submodule headers
-        run: |
-          f="externals/dynarmic/externals/mcl/include/boost/variant.hpp"
-          if [ -f "$f" ] && grep -q 'C:/Users' "$f"; then
-            printf '// Forwarding header\n#include <boost/variant/variant.hpp>\n#include <boost/variant/recursive_variant.hpp>\n#include <boost/variant/recursive_wrapper.hpp>\n#include <boost/variant/get.hpp>\n#include <boost/variant/apply_visitor.hpp>\n#include <boost/variant/static_visitor.hpp>\n#include <boost/variant/visitor_ptr.hpp>\n' > "$f"
-          fi
       - name: Install deps
         run: >-
           brew install asc ninja qt@6 openssl ffmpeg glslang molten-vk boost
@@ -269,10 +247,6 @@ jobs:
           prepare: |
             pkg install -y cmake ninja qt6-base qt6-charts qt6-svg qt6-multimedia openssl pulseaudio vulkan-headers pkgconf libX11 libXext libXrandr libXScrnSaver wayland wayland-protocols libdecor mesa-libs evdev-proto glslang ffmpeg boost-all
           run: |
-            f="externals/dynarmic/externals/mcl/include/boost/variant.hpp"
-            if [ -f "$f" ] && grep -q 'C:/Users' "$f"; then
-              printf '// Forwarding header\n#include <boost/variant/variant.hpp>\n#include <boost/variant/recursive_variant.hpp>\n#include <boost/variant/recursive_wrapper.hpp>\n#include <boost/variant/get.hpp>\n#include <boost/variant/apply_visitor.hpp>\n#include <boost/variant/static_visitor.hpp>\n#include <boost/variant/visitor_ptr.hpp>\n' > "$f"
-            fi
             cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_QT=ON \
               -DYUZU_USE_BUNDLED_QT=OFF \
               -DVulkanHeaders_FORCE_BUNDLED=ON \
@@ -307,12 +281,6 @@ jobs:
       - name: Init submodules
         run: |
           git -c submodule."externals/ownfoil".update=none -c submodule."externals/nxdumptool".update=none -c submodule."externals/nxapi".update=none -c submodule."externals/nx-optimizer".update=none submodule update --init --recursive --depth=1
-      - name: Fix submodule headers
-        run: |
-          f="externals/dynarmic/externals/mcl/include/boost/variant.hpp"
-          if [ -f "$f" ] && grep -q 'C:/Users' "$f"; then
-            printf '// Forwarding header\n#include <boost/variant/variant.hpp>\n#include <boost/variant/recursive_variant.hpp>\n#include <boost/variant/recursive_wrapper.hpp>\n#include <boost/variant/get.hpp>\n#include <boost/variant/apply_visitor.hpp>\n#include <boost/variant/static_visitor.hpp>\n#include <boost/variant/visitor_ptr.hpp>\n' > "$f"
-          fi
       - uses: actions/setup-java@v6
         with:
           distribution: microsoft
@@ -385,12 +353,6 @@ jobs:
       - name: Init submodules
         run: |
           git -c submodule."externals/ownfoil".update=none -c submodule."externals/nxdumptool".update=none -c submodule."externals/nxapi".update=none -c submodule."externals/nx-optimizer".update=none submodule update --init --recursive --depth=1
-      - name: Fix submodule headers
-        run: |
-          f="externals/dynarmic/externals/mcl/include/boost/variant.hpp"
-          if [ -f "$f" ] && grep -q 'C:/Users' "$f"; then
-            printf '// Forwarding header\n#include <boost/variant/variant.hpp>\n#include <boost/variant/recursive_variant.hpp>\n#include <boost/variant/recursive_wrapper.hpp>\n#include <boost/variant/get.hpp>\n#include <boost/variant/apply_visitor.hpp>\n#include <boost/variant/static_visitor.hpp>\n#include <boost/variant/visitor_ptr.hpp>\n' > "$f"
-          fi
       - name: Install deps
         run: |
           sudo apt-get update
@@ -444,13 +406,6 @@ jobs:
       - name: Init submodules
         run: |
           git -c submodule."externals/ownfoil".update=none -c submodule."externals/nxdumptool".update=none -c submodule."externals/nxapi".update=none -c submodule."externals/nx-optimizer".update=none submodule update --init --recursive --depth=1
-      - name: Fix submodule headers
-        shell: bash
-        run: |
-          f="externals/dynarmic/externals/mcl/include/boost/variant.hpp"
-          if [ -f "$f" ] && grep -q 'C:/Users' "$f"; then
-            printf '// Forwarding header\n#include <boost/variant/variant.hpp>\n#include <boost/variant/recursive_variant.hpp>\n#include <boost/variant/recursive_wrapper.hpp>\n#include <boost/variant/get.hpp>\n#include <boost/variant/apply_visitor.hpp>\n#include <boost/variant/static_visitor.hpp>\n#include <boost/variant/visitor_ptr.hpp>\n' > "$f"
-          fi
       - uses: ilammy/msvc-dev-cmd@v1
       - name: Install Vulkan SDK
         shell: pwsh
@@ -505,12 +460,6 @@ jobs:
       - name: Init submodules
         run: |
           git -c submodule."externals/ownfoil".update=none -c submodule."externals/nxdumptool".update=none -c submodule."externals/nxapi".update=none -c submodule."externals/nx-optimizer".update=none submodule update --init --recursive --depth=1
-      - name: Fix submodule headers
-        run: |
-          f="externals/dynarmic/externals/mcl/include/boost/variant.hpp"
-          if [ -f "$f" ] && grep -q 'C:/Users' "$f"; then
-            printf '// Forwarding header\n#include <boost/variant/variant.hpp>\n#include <boost/variant/recursive_variant.hpp>\n#include <boost/variant/recursive_wrapper.hpp>\n#include <boost/variant/get.hpp>\n#include <boost/variant/apply_visitor.hpp>\n#include <boost/variant/static_visitor.hpp>\n#include <boost/variant/visitor_ptr.hpp>\n' > "$f"
-          fi
       - name: Install native deps
         run: |
           sudo apt-get update
