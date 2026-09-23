@@ -33,18 +33,18 @@ if [ "${#files[@]}" -eq 0 ]; then
 fi
 
 required=(
-  drippu-windows-x64.zip
   drippu-linux-x64.tar.gz
   drippu-linux-x86_64.AppImage
   drippu-macos-arm64.tar.gz
-  drippu-freebsd-x64.tar.gz
-  drippu-libretro-core-linux-x64.tar.gz
-  drippu-libretro-core-windows-x64.zip
-  drippu-libretro-core-android-arm64.tar.gz
-  app-legacy-release.apk
-  app-mainline-release.apk
-  app-chromeOS-release.apk
-  app-genshinSpoof-release.apk
+  #drippu-windows-x64.zip
+  # drippu-freebsd-x64.tar.gz
+  # drippu-libretro-core-linux-x64.tar.gz
+  # drippu-libretro-core-windows-x64.zip
+  # drippu-libretro-core-android-arm64.tar.gz
+  # app-legacy-release.apk
+  # app-mainline-release.apk
+  # app-chromeOS-release.apk
+  # app-genshinSpoof-release.apk
 )
 
 artifact_names=()
