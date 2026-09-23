@@ -89,36 +89,14 @@ jobs:
         with:
           submodules: recursive
       - name: Fix submodule headers
-        run: |
-          f="externals/dynarmic/externals/mcl/include/boost/variant.hpp"
-          if [ -f "$f" ] && grep -q 'C:/Users' "$f"; then
-            printf '// Forwarding header\n#include <boost/variant/variant.hpp>\n#include <boost/variant/recursive_variant.hpp>\n#include <boost/variant/recursive_wrapper.hpp>\n#include <boost/variant/get.hpp>\n#include <boost/variant/apply_visitor.hpp>\n#include <boost/variant/static_visitor.hpp>\n#include <boost/variant/visitor_ptr.hpp>\n' > "$f"
-          fi
+        run: bash .github/scripts/fix-submodule-headers.sh
       - name: Install deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build glslang-tools patchelf ccache \
-            qt6-base-dev qt6-base-dev-tools qt6-base-private-dev qt6-qpa-plugins \
-            qt6-wayland \
-            qt6-multimedia-dev qt6-tools-dev qt6-svg-dev qt6-webengine-dev \
-            qt6-charts-dev \
-            libssl-dev libusb-1.0-0-dev libpulse-dev \
-            libvulkan-dev gamemode-dev \
-            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev \
-            libxfixes-dev libxss-dev libxkbcommon-dev libxtst-dev \
-            libwayland-dev libwayland-egl1 wayland-protocols libdecor-0-dev \
-            libegl-dev libdrm-dev libgbm-dev \
-            libavcodec-dev libavfilter-dev libavutil-dev libswscale-dev \
-            libboost-all-dev
-      - name: Restore ccache
-        uses: actions/cache@v4
+        run: bash .github/scripts/install-linux-deps.sh
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
         with:
-          path: ~/.cache/ccache
-          key: ${{ runner.os }}-ccache-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-ccache-
-      - name: Configure ccache
-        run: ccache --max-size=6G --zero-stats
+          key: ${{ runner.os }}-release
+          max-size: 6G
       - name: Configure
         run: |
           cmake --version
@@ -131,111 +109,9 @@ jobs:
           name: cmake-log-linux
           path: cmake_configure.log
       - name: Build
-        run: cmake --build build --target suyu suyu-cmd -j4
-      - name: ccache stats
-        if: always()
-        run: ccache --show-stats
+        run: cmake --build build --target suyu suyu-cmd -j"$(nproc)"
       - name: Package
-        run: |
-          set -euo pipefail
-          rm -rf _pkg && mkdir -p _pkg/lib
-          cp build/bin/suyu _pkg/drippu
-          cp build/bin/suyu-cmd _pkg/drippu-cmd 2>/dev/null || true
-
-          # --- Bundle non-base runtime libraries (linked deps, found via ldd)
-          EXCLUDE_REGEX='^(linux-vdso|ld-linux|libc\.so|libm\.so|libpthread\.so|libdl\.so|librt\.so|libresolv\.so|libnsl\.so|libutil\.so|libgcc_s\.so|libstdc\+\+\.so|libGL\.so|libGLX\.so|libGLdispatch\.so|libEGL\.so|libvulkan\.so|libX11\.so|libXext\.so|libXrandr\.so|libXcursor\.so|libXi\.so|libXfixes\.so|libxcb\.|libwayland-|libdrm\.so|libgbm\.so)'
-          : "${EXCLUDE_REGEX:?EXCLUDE_REGEX must be set}"
-
-          declare -A seen
-          collect_deps() {
-            ldd "$1" 2>/dev/null | awk '{print $3}' | grep -E '^/' || true
-          }
-
-          bundle_recursive() {
-            local queue
-            queue=$(collect_deps "$1")
-            while [ -n "$queue" ]; do
-              local next=""
-              for lib in $queue; do
-                local name
-                name=$(basename "$lib")
-                if [[ -z "${seen[$name]:-}" ]] && ! echo "$name" | grep -qE "$EXCLUDE_REGEX"; then
-                  seen[$name]=1
-                  cp -v "$lib" _pkg/lib/
-                  next="$next $(collect_deps "$lib")"
-                fi
-              done
-              queue="$next"
-            done
-          }
-
-          bundle_recursive _pkg/drippu
-          [ -f _pkg/drippu-cmd ] && bundle_recursive _pkg/drippu-cmd
-
-          echo "Bundled libraries:"
-          ls -la _pkg/lib
-
-          # --- Bundle Qt plugins. These are dlopen'd at runtime, not linked, so
-          # ldd never sees them - this is a separate discovery mechanism from the
-          # block above and must be handled independently. qt.conf below replaces
-          # Qt's compiled-in plugin path, so every plugin the app may load (TLS,
-          # Wayland shell/buffer integrations, imageformats, iconengines, ...)
-          # must be bundled, not just platforms/ and xcbglintegrations/.
-          # Discover the plugin directory at runtime: on Ubuntu 24.04 libqxcb.so
-          # ships in libqt6gui6t64 while the remaining QPA plugins live in
-          # qt6-qpa-plugins, so hardcoding a package name is not reliable.
-          QT_PLUGINS_DIR="$(qtpaths6 --plugin-dir 2>/dev/null || true)"
-          if [ -z "${QT_PLUGINS_DIR:-}" ] || [ ! -d "$QT_PLUGINS_DIR/platforms" ]; then
-            QT_PLUGINS_DIR="$(dirname "$(find /usr/lib -type f -path '*/qt6/plugins/platforms/libqxcb.so' -print -quit)")/.."
-          fi
-          : "${QT_PLUGINS_DIR:?Qt plugin directory not found}"
-          test -d "$QT_PLUGINS_DIR/platforms"
-
-          rm -rf _pkg/plugins
-          mkdir -p _pkg/plugins
-          cp -a "$QT_PLUGINS_DIR"/. _pkg/plugins/
-          # Drop compositor/server-only plugins a desktop client can never use.
-          rm -rf _pkg/plugins/wayland-graphics-integration-server \
-                 _pkg/plugins/wayland-decoration-server
-
-          while IFS= read -r p; do
-            bundle_recursive "$p"
-          done < <(find _pkg/plugins -type f -name '*.so')
-
-          # Fail CI loudly if an essential plugin was not packaged, instead of
-          # letting users hit "no TLS backend" / "no shell integration" at runtime.
-          for required in \
-            plugins/platforms/libqxcb.so \
-            plugins/tls/libqopensslbackend.so \
-            plugins/wayland-shell-integration/libxdg-shell.so \
-            plugins/wayland-graphics-integration-client/libqt-plugin-wayland-egl.so; do
-            test -f "_pkg/$required" || { echo "missing Qt plugin: $required"; exit 1; }
-          done
-
-          cat > _pkg/qt.conf << 'EOF'
-          [Paths]
-          Prefix = .
-          Plugins = plugins
-          EOF
-
-          # --- Point every bundled binary/library/plugin at ./lib via RPATH.
-          # RPATH does NOT cascade to a library's own dependencies - each file that
-          # itself has NEEDED entries must be patched individually, or resolution
-          # silently falls through to the (mismatched) system libs.
-          patchelf --set-rpath '$ORIGIN/lib' _pkg/drippu
-          [ -f _pkg/drippu-cmd ] && patchelf --set-rpath '$ORIGIN/lib' _pkg/drippu-cmd
-
-          for f in _pkg/lib/*.so*; do
-            patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true
-          done
-
-          # Every Qt plugin subdir sits exactly one level under plugins/, so the
-          # same relative RPATH applies to all of them.
-          while IFS= read -r p; do
-            patchelf --set-rpath '$ORIGIN/../../lib' "$p" 2>/dev/null || true
-          done < <(find _pkg/plugins -type f -name '*.so')
-
-          tar -czf drippu-linux-x64.tar.gz -C _pkg .
+        run: bash .github/scripts/package_linux.sh
       - name: Verify packaged Linux application and dependencies
         run: python3 .github/scripts/verify_release_artifacts.py desktop --platform linux --archive drippu-linux-x64.tar.gz
       - name: Record toolchain
