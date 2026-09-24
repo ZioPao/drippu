@@ -521,14 +521,12 @@ jobs:
         id: release
         run: |
           version="${{ inputs.release_version || 'v0.0.5' }}"
-          short_sha="${GITHUB_SHA:0:12}"
-          echo "short_sha=${short_sha}" >> "$GITHUB_OUTPUT"
-          echo "tag=${version}-$(date -u +%Y%m%d)-${short_sha}" >> "$GITHUB_OUTPUT"
+          echo "tag=${version}-$(date -u +%Y%m%d)-${GITHUB_SHA:0:12}" >> "$GITHUB_OUTPUT"
       - name: Create release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.release.outputs.tag }}
-          name: drippu ${{ inputs.release_version || 'v0.0.5' }}-${{ steps.release.outputs.short_sha }} automated build
+          name: drippu ${{ inputs.release_version || 'v0.0.5' }} automated build
           target_commitish: ${{ github.sha }}
           prerelease: true
           generate_release_notes: true
