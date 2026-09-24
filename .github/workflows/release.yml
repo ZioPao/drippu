@@ -39,16 +39,17 @@ jobs:
           $sdkDir = Get-ChildItem C:\VulkanSDK -Directory | Sort-Object Name -Descending | Select-Object -First 1
           echo "VULKAN_SDK=$($sdkDir.FullName)" >> $env:GITHUB_ENV
           echo "$($sdkDir.FullName)\Bin" >> $env:GITHUB_PATH
-      - name: ccache
+      - name: sccache
         uses: hendrikmuhs/ccache-action@v1.2.24
         with:
+          variant: sccache
           key: ${{ runner.os }}-release-windows
           max-size: 2G
       - name: Configure
         shell: bash
         run: |
           cmake --version
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_QT=ON -DYUZU_USE_BUNDLED_QT=OFF -DUSE_CCACHE=ON -GNinja 2>&1 | tee cmake_configure.log
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_QT=ON -DYUZU_USE_BUNDLED_QT=OFF -DUSE_CCACHE=ON -DCCACHE_PATH=sccache -GNinja 2>&1 | tee cmake_configure.log
           test ${PIPESTATUS[0]} -eq 0
       - name: Upload cmake log
         if: failure()
@@ -416,15 +417,16 @@ jobs:
           $sdkDir = Get-ChildItem C:\VulkanSDK -Directory | Sort-Object Name -Descending | Select-Object -First 1
           echo "VULKAN_SDK=$($sdkDir.FullName)" >> $env:GITHUB_ENV
           echo "$($sdkDir.FullName)\Bin" >> $env:GITHUB_PATH
-      - name: ccache
+      - name: sccache
         uses: hendrikmuhs/ccache-action@v1.2.24
         with:
+          variant: sccache
           key: ${{ runner.os }}-release-libretro-windows
           max-size: 2G
       - name: Configure
         shell: bash
         run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DSUYU_BUILD_LIBRETRO_CORE=ON -DENABLE_QT=OFF -DUSE_CCACHE=ON -GNinja 2>&1 | tee cmake_configure.log
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DSUYU_BUILD_LIBRETRO_CORE=ON -DENABLE_QT=OFF -DUSE_CCACHE=ON -DCCACHE_PATH=sccache -GNinja 2>&1 | tee cmake_configure.log
           test ${PIPESTATUS[0]} -eq 0
       - name: Upload cmake log
         if: failure()
