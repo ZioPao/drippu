@@ -1,11 +1,9 @@
 name: Automated drippu release
-run-name: drippu ${{ inputs.release_version || 'v0.0.5' }}-${{ github.sha }} automated build
+run-name: ${{ github.sha }}
 
 on:
-  #push:
-  # schedule:
-  #   - cron: '0 0 1 * *'
-  #   - cron: '0 0 * * 0'
+  schedule:
+    - cron: "0 3 * * *"
   workflow_dispatch:
     inputs:
       release_version:
@@ -18,8 +16,29 @@ permissions:
   contents: write
 
 jobs:
+  check:
+    name: Check for new commits
+    runs-on: ubuntu-24.04
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - name: Check if commit was already released
+        id: diff
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          short="${GITHUB_SHA:0:12}"
+          if gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/" --paginate --jq '.[].ref' | grep -q "$short"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build-windows:
     name: Windows
+    needs: check
+    if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -29,7 +48,7 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@v1
       - uses: jurplel/install-qt-action@v4
         with:
-          version: '6.7.0'
+          version: "6.7.0"
           arch: win64_msvc2019_64
           modules: qtcharts qtmultimedia qtwebengine
       - name: Install Vulkan SDK
@@ -82,6 +101,8 @@ jobs:
 
   build-linux:
     name: Linux
+    needs: check
+    if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -120,9 +141,11 @@ jobs:
           path: |
             drippu-linux-x86_64.AppImage
             toolchain.txt
-  
+
   build-macos:
     name: macOS
+    needs: check
+    if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
@@ -238,6 +261,8 @@ jobs:
 
   build-freebsd:
     name: FreeBSD
+    needs: check
+    if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -278,6 +303,8 @@ jobs:
 
   build-android:
     name: Android
+    needs: check
+    if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -287,7 +314,7 @@ jobs:
       - uses: actions/setup-java@v6
         with:
           distribution: microsoft
-          java-version: '17'
+          java-version: "17"
       - name: Install native deps
         run: |
           sudo apt-get update
@@ -350,6 +377,8 @@ jobs:
 
   build-libretro:
     name: Libretro
+    needs: check
+    if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -403,6 +432,8 @@ jobs:
 
   build-libretro-windows:
     name: Libretro Windows
+    needs: check
+    if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -458,6 +489,8 @@ jobs:
 
   build-libretro-android:
     name: Libretro Android
+    needs: check
+    if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -513,7 +546,15 @@ jobs:
 
   release:
     name: Publish Release
-    needs: [build-windows, build-linux, build-freebsd, build-libretro, build-libretro-windows, build-libretro-android]
+    needs:
+      [
+        build-windows,
+        build-linux,
+        build-freebsd,
+        build-libretro,
+        build-libretro-windows,
+        build-libretro-android,
+      ]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v8
