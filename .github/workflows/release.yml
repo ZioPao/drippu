@@ -1,4 +1,5 @@
 name: Automated drippu release
+run-name: drippu ${{ inputs.release_version || 'v0.0.5' }}-${{ github.sha }} automated build
 
 on:
   #push:
@@ -39,7 +40,7 @@ jobs:
           echo "VULKAN_SDK=$($sdkDir.FullName)" >> $env:GITHUB_ENV
           echo "$($sdkDir.FullName)\Bin" >> $env:GITHUB_PATH
       - name: ccache
-        uses: hendrikmuhs/ccache-action@v1.2
+        uses: hendrikmuhs/ccache-action@v1.2.24
         with:
           key: ${{ runner.os }}-release-windows
           max-size: 2G
@@ -89,7 +90,7 @@ jobs:
       - name: Install deps
         run: bash .github/scripts/install-linux-deps.sh
       - name: ccache
-        uses: hendrikmuhs/ccache-action@v1.2
+        uses: hendrikmuhs/ccache-action@v1.2.24
         with:
           key: ${{ runner.os }}-release
           max-size: 6G
@@ -132,7 +133,7 @@ jobs:
   #         brew install asc ninja qt@6 openssl ffmpeg glslang molten-vk boost
   #         pkgconf libusb enet sdl3 opus nasm autoconf automake libtool
   #     - name: ccache
-  #       uses: hendrikmuhs/ccache-action@v1.2
+  #       uses: hendrikmuhs/ccache-action@v1.2.24
   #       with:
   #         key: ${{ runner.os }}-release-macos
   #         max-size: 2G
@@ -366,7 +367,7 @@ jobs:
             libavcodec-dev libavfilter-dev libavutil-dev libswscale-dev \
             libboost-all-dev
       - name: ccache
-        uses: hendrikmuhs/ccache-action@v1.2
+        uses: hendrikmuhs/ccache-action@v1.2.24
         with:
           key: ${{ runner.os }}-release-libretro
           max-size: 2G
@@ -416,7 +417,7 @@ jobs:
           echo "VULKAN_SDK=$($sdkDir.FullName)" >> $env:GITHUB_ENV
           echo "$($sdkDir.FullName)\Bin" >> $env:GITHUB_PATH
       - name: ccache
-        uses: hendrikmuhs/ccache-action@v1.2
+        uses: hendrikmuhs/ccache-action@v1.2.24
         with:
           key: ${{ runner.os }}-release-libretro-windows
           max-size: 2G
@@ -470,7 +471,7 @@ jobs:
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;28.2.13676358" > /dev/null
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
       - name: ccache
-        uses: hendrikmuhs/ccache-action@v1.2
+        uses: hendrikmuhs/ccache-action@v1.2.24
         with:
           key: ${{ runner.os }}-release-libretro-android
           max-size: 2G
@@ -520,12 +521,14 @@ jobs:
         id: release
         run: |
           version="${{ inputs.release_version || 'v0.0.5' }}"
-          echo "tag=${version}-$(date -u +%Y%m%d)-${GITHUB_SHA:0:12}" >> "$GITHUB_OUTPUT"
+          short_sha="${GITHUB_SHA:0:12}"
+          echo "short_sha=${short_sha}" >> "$GITHUB_OUTPUT"
+          echo "tag=${version}-$(date -u +%Y%m%d)-${short_sha}" >> "$GITHUB_OUTPUT"
       - name: Create release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.release.outputs.tag }}
-          name: drippu ${{ inputs.release_version || 'v0.0.5' }} automated build
+          name: drippu ${{ inputs.release_version || 'v0.0.5' }}-${{ steps.release.outputs.short_sha }} automated build
           target_commitish: ${{ github.sha }}
           prerelease: true
           generate_release_notes: true
@@ -533,5 +536,6 @@ jobs:
           files: |
             artifacts/**/*.zip
             artifacts/**/*.tar.gz
-            artifacts/**/*.apk
             artifacts/**/*.AppImage
+
+#artifacts/**/*.apk
