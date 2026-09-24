@@ -550,7 +550,9 @@ jobs:
       [
         build-windows,
         build-linux,
+        build-macos,
         build-freebsd,
+        build-android,
         build-libretro,
         build-libretro-windows,
         build-libretro-android,
