@@ -246,6 +246,13 @@ jobs:
 #           xcrun stapler validate _pkg/drippu.app
 #           spctl --assess --type execute --verbose=2 _pkg/drippu.app
 #           tar -czf drippu-macos-arm64.tar.gz -C _pkg .
+      - name: Package unsigned macOS snapshot
+        run: |
+          rm -rf _pkg
+          mkdir -p _pkg
+          ditto build/bin/suyu.app _pkg/drippu.app
+          cp build/bin/suyu-cmd _pkg/drippu-cmd
+          tar -czf drippu-macos-arm64.tar.gz -C _pkg .
       - name: Verify packaged macOS application and dependencies
         run: python3 .github/scripts/verify_release_artifacts.py desktop --platform macos --archive drippu-macos-arm64.tar.gz
       - name: Remove signing keychain
