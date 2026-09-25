@@ -169,7 +169,7 @@ std::string ReadFile(const fs::path& path) {
 constexpr u32 kMovzX0_5 = 0xD28000A0u;
 constexpr u32 kMovzX1_7 = 0xD28000E1u;
 constexpr u32 kMovX0Zero = 0xD2800000u;
-constexpr u32 kAddX2X0X1 = 0x8B010002u;
+constexpr u32 kCbzX0Plus8 = 0xB4000040u;
 constexpr u32 kSvc0 = 0xD4000001u;
 constexpr u32 kRetX5 = 0xD65F00A0u;
 constexpr u32 kRetX30 = 0xD65F03C0u;
@@ -293,7 +293,9 @@ void TestEmitProjectCompile(const fs::path& root) {
     const fs::path out = root / "emit_project";
     fs::create_directories(out);
 
-    u32 text[4] = {kMovzX0_5, kMovzX1_7, kAddX2X0X1, kSvc0};
+    // CBZ splits both taken and fallthrough into chainable generated blocks.
+    // Compiling the emitted project catches invalid C in either chain arm.
+    u32 text[4] = {kMovzX0_5, kCbzX0Plus8, kMovzX1_7, kSvc0};
     suyu::recomp::EmitProject("smoke", reinterpret_cast<const suyu::recomp::u8*>(text),
                               sizeof(text), 0x1000, out.string(), true);
 

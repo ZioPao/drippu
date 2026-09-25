@@ -2,6 +2,9 @@ name: Automated drippu release
 run-name: ${{ github.sha }}
 
 on:
+  push:
+    branches:
+      - fix-macos-build
   schedule:
     - cron: "0 3 * * *"
   workflow_dispatch:
@@ -35,113 +38,113 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-  build-windows:
-    name: Windows
-    needs: check
-    if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Init submodules
-        run: |
-          git -c submodule."externals/ownfoil".update=none -c submodule."externals/nxdumptool".update=none -c submodule."externals/nxapi".update=none -c submodule."externals/nx-optimizer".update=none submodule update --init --recursive --depth=1
-      - uses: ilammy/msvc-dev-cmd@v1
-      - uses: jurplel/install-qt-action@v4
-        with:
-          version: "6.7.0"
-          arch: win64_msvc2019_64
-          modules: qtcharts qtmultimedia qtwebengine
-      - name: Install Vulkan SDK
-        shell: pwsh
-        run: |
-          choco install vulkan-sdk -y --no-progress
-          $sdkDir = Get-ChildItem C:\VulkanSDK -Directory | Sort-Object Name -Descending | Select-Object -First 1
-          echo "VULKAN_SDK=$($sdkDir.FullName)" >> $env:GITHUB_ENV
-          echo "$($sdkDir.FullName)\Bin" >> $env:GITHUB_PATH
-      - name: sccache
-        uses: hendrikmuhs/ccache-action@v1.2.24
-        with:
-          variant: sccache
-          key: ${{ runner.os }}-release-windows
-          max-size: 2G
-      - name: Configure
-        shell: bash
-        run: |
-          cmake --version
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_QT=ON -DYUZU_USE_BUNDLED_QT=OFF -DUSE_CCACHE=ON -DCCACHE_PATH=sccache -GNinja 2>&1 | tee cmake_configure.log
-          test ${PIPESTATUS[0]} -eq 0
-      - name: Upload cmake log
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: cmake-log-windows
-          path: cmake_configure.log
-      - name: Build
-        run: cmake --build build --target suyu suyu-cmd -j4
-      - name: Package
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force _pkg
-          Copy-Item build/bin/suyu.exe _pkg/drippu.exe
-          Copy-Item build/bin/suyu-cmd.exe _pkg/drippu-cmd.exe
-          windeployqt --release --no-translations _pkg/drippu.exe
-          Compress-Archive -Path _pkg/* -DestinationPath drippu-windows-x64.zip
-      - name: Verify packaged Windows application and dependencies
-        shell: pwsh
-        run: python .github/scripts/verify_release_artifacts.py desktop --platform windows --archive drippu-windows-x64.zip
-      - name: Record toolchain
-        shell: bash
-        run: bash .github/scripts/write_toolchain.sh toolchain.txt
-      - uses: actions/upload-artifact@v7
-        with:
-          name: windows
-          path: |
-            drippu-windows-x64.zip
-            toolchain.txt
-
-  build-linux:
-    name: Linux
-    needs: check
-    if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-
-      - name: Install deps
-        run: bash .github/scripts/install-linux-deps.sh
-      - name: ccache
-        uses: hendrikmuhs/ccache-action@v1.2.24
-        with:
-          key: ${{ runner.os }}-release
-          max-size: 6G
-      - name: Configure
-        run: |
-          cmake --version
-          set -o pipefail
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_QT=ON -DYUZU_USE_BUNDLED_QT=OFF -DUSE_CCACHE=ON -GNinja -DOPENSSL_ROOT_DIR=/usr 2>&1 | tee cmake_configure.log
-      - name: Upload cmake log
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: cmake-log-linux
-          path: cmake_configure.log
-      - name: Build
-        run: cmake --build build --target suyu suyu-cmd -j"$(nproc)"
-      - name: Package AppImage
-        run: bash .github/scripts/package_appimage.sh
-      - name: Verify packaged Linux AppImage
-        run: python3 .github/scripts/verify_release_artifacts.py desktop --platform linux --archive drippu-linux-x86_64.AppImage
-      - name: Record toolchain
-        run: bash .github/scripts/write_toolchain.sh toolchain.txt
-      - uses: actions/upload-artifact@v7
-        with:
-          name: linux-appimage
-          path: |
-            drippu-linux-x86_64.AppImage
-            toolchain.txt
-
+#   build-windows:
+#     name: Windows
+#     needs: check
+#     if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
+#     runs-on: windows-latest
+#     steps:
+#       - uses: actions/checkout@v7
+#       - name: Init submodules
+#         run: |
+#           git -c submodule."externals/ownfoil".update=none -c submodule."externals/nxdumptool".update=none -c submodule."externals/nxapi".update=none -c submodule."externals/nx-optimizer".update=none submodule update --init --recursive --depth=1
+#       - uses: ilammy/msvc-dev-cmd@v1
+#       - uses: jurplel/install-qt-action@v4
+#         with:
+#           version: "6.7.0"
+#           arch: win64_msvc2019_64
+#           modules: qtcharts qtmultimedia qtwebengine
+#       - name: Install Vulkan SDK
+#         shell: pwsh
+#         run: |
+#           choco install vulkan-sdk -y --no-progress
+#           $sdkDir = Get-ChildItem C:\VulkanSDK -Directory | Sort-Object Name -Descending | Select-Object -First 1
+#           echo "VULKAN_SDK=$($sdkDir.FullName)" >> $env:GITHUB_ENV
+#           echo "$($sdkDir.FullName)\Bin" >> $env:GITHUB_PATH
+#       - name: sccache
+#         uses: hendrikmuhs/ccache-action@v1.2.24
+#         with:
+#           variant: sccache
+#           key: ${{ runner.os }}-release-windows
+#           max-size: 2G
+#       - name: Configure
+#         shell: bash
+#         run: |
+#           cmake --version
+#           cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_QT=ON -DYUZU_USE_BUNDLED_QT=OFF -DUSE_CCACHE=ON -DCCACHE_PATH=sccache -GNinja 2>&1 | tee cmake_configure.log
+#           test ${PIPESTATUS[0]} -eq 0
+#       - name: Upload cmake log
+#         if: failure()
+#         uses: actions/upload-artifact@v7
+#         with:
+#           name: cmake-log-windows
+#           path: cmake_configure.log
+#       - name: Build
+#         run: cmake --build build --target suyu suyu-cmd -j4
+#       - name: Package
+#         shell: pwsh
+#         run: |
+#           New-Item -ItemType Directory -Force _pkg
+#           Copy-Item build/bin/suyu.exe _pkg/drippu.exe
+#           Copy-Item build/bin/suyu-cmd.exe _pkg/drippu-cmd.exe
+#           windeployqt --release --no-translations _pkg/drippu.exe
+#           Compress-Archive -Path _pkg/* -DestinationPath drippu-windows-x64.zip
+#       - name: Verify packaged Windows application and dependencies
+#         shell: pwsh
+#         run: python .github/scripts/verify_release_artifacts.py desktop --platform windows --archive drippu-windows-x64.zip
+#       - name: Record toolchain
+#         shell: bash
+#         run: bash .github/scripts/write_toolchain.sh toolchain.txt
+#       - uses: actions/upload-artifact@v7
+#         with:
+#           name: windows
+#           path: |
+#             drippu-windows-x64.zip
+#             toolchain.txt
+# 
+#   build-linux:
+#     name: Linux
+#     needs: check
+#     if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
+#     runs-on: ubuntu-24.04
+#     steps:
+#       - uses: actions/checkout@v7
+#         with:
+#           submodules: recursive
+# 
+#       - name: Install deps
+#         run: bash .github/scripts/install-linux-deps.sh
+#       - name: ccache
+#         uses: hendrikmuhs/ccache-action@v1.2.24
+#         with:
+#           key: ${{ runner.os }}-release
+#           max-size: 6G
+#       - name: Configure
+#         run: |
+#           cmake --version
+#           set -o pipefail
+#           cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_QT=ON -DYUZU_USE_BUNDLED_QT=OFF -DUSE_CCACHE=ON -GNinja -DOPENSSL_ROOT_DIR=/usr 2>&1 | tee cmake_configure.log
+#       - name: Upload cmake log
+#         if: failure()
+#         uses: actions/upload-artifact@v7
+#         with:
+#           name: cmake-log-linux
+#           path: cmake_configure.log
+#       - name: Build
+#         run: cmake --build build --target suyu suyu-cmd -j"$(nproc)"
+#       - name: Package AppImage
+#         run: bash .github/scripts/package_appimage.sh
+#       - name: Verify packaged Linux AppImage
+#         run: python3 .github/scripts/verify_release_artifacts.py desktop --platform linux --archive drippu-linux-x86_64.AppImage
+#       - name: Record toolchain
+#         run: bash .github/scripts/write_toolchain.sh toolchain.txt
+#       - uses: actions/upload-artifact@v7
+#         with:
+#           name: linux-appimage
+#           path: |
+#             drippu-linux-x86_64.AppImage
+#             toolchain.txt
+# 
   build-macos:
     name: macOS
     needs: check
@@ -191,57 +194,58 @@ jobs:
         run: |
           build/bin/suyu.app/Contents/MacOS/macos_moltenvk_smoke 2>&1 | tee macos-moltenvk-smoke.log
           grep -F "macos_moltenvk_smoke: OK" macos-moltenvk-smoke.log
-      - name: Validate signing configuration
-        env:
-          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
-          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          ASC_PRIVATE_KEY_B64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
-        run: |
-          for name in MACOS_CERTIFICATE_P12 MACOS_CERTIFICATE_PASSWORD MACOS_SIGNING_IDENTITY ASC_KEY_ID ASC_ISSUER_ID ASC_PRIVATE_KEY_B64; do
-            test -n "${!name}" || { echo "Missing required macOS release secret: $name"; exit 1; }
-          done
-      - name: Import Developer ID certificate
-        env:
-          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
-          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-        run: |
-          keychain="$RUNNER_TEMP/drippu-signing.keychain-db"
-          certificate="$RUNNER_TEMP/drippu-signing.p12"
-          keychain_password="$(uuidgen)"
-          printf '%s' "$MACOS_CERTIFICATE_P12" | base64 --decode > "$certificate"
-          security create-keychain -p "$keychain_password" "$keychain"
-          security set-keychain-settings -lut 21600 "$keychain"
-          security unlock-keychain -p "$keychain_password" "$keychain"
-          security import "$certificate" -k "$keychain" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain"
-          security list-keychains -d user -s "$keychain" login.keychain-db
-          echo "MACOS_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
-      - name: Package
-        env:
-          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
-        run: |
-          python3 .github/scripts/package_macos.py \
-            --app build/bin/suyu.app \
-            --cli build/bin/suyu-cmd \
-            --output-dir _pkg
-      - name: Notarize and staple
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          ASC_PRIVATE_KEY_B64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
-          ASC_BYPASS_KEYCHAIN: "true"
-        run: |
-          ditto -c -k --keepParent _pkg "$RUNNER_TEMP/drippu-macos-notarization.zip"
-          asc notarization submit \
-            --file "$RUNNER_TEMP/drippu-macos-notarization.zip" \
-            --wait
-          xcrun stapler staple _pkg/drippu.app
-          xcrun stapler validate _pkg/drippu.app
-          spctl --assess --type execute --verbose=2 _pkg/drippu.app
-          tar -czf drippu-macos-arm64.tar.gz -C _pkg .
+      # Disabled: no signing certificate/ASC key available in this test run.
+      # - name: Validate signing configuration
+      #   env:
+      #     MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+      #     MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+      #     MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+      #     ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      #     ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      #     ASC_PRIVATE_KEY_B64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
+      #   run: |
+      #     for name in MACOS_CERTIFICATE_P12 MACOS_CERTIFICATE_PASSWORD MACOS_SIGNING_IDENTITY ASC_KEY_ID ASC_ISSUER_ID ASC_PRIVATE_KEY_B64; do
+      #       test -n "${!name}" || { echo "Missing required macOS release secret: $name"; exit 1; }
+      #     done
+#       - name: Import Developer ID certificate
+#         env:
+#           MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+#           MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+#         run: |
+#           keychain="$RUNNER_TEMP/drippu-signing.keychain-db"
+#           certificate="$RUNNER_TEMP/drippu-signing.p12"
+#           keychain_password="$(uuidgen)"
+#           printf '%s' "$MACOS_CERTIFICATE_P12" | base64 --decode > "$certificate"
+#           security create-keychain -p "$keychain_password" "$keychain"
+#           security set-keychain-settings -lut 21600 "$keychain"
+#           security unlock-keychain -p "$keychain_password" "$keychain"
+#           security import "$certificate" -k "$keychain" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+#           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain"
+#           security list-keychains -d user -s "$keychain" login.keychain-db
+#           echo "MACOS_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+#       - name: Package
+#         env:
+#           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+#         run: |
+#           python3 .github/scripts/package_macos.py \
+#             --app build/bin/suyu.app \
+#             --cli build/bin/suyu-cmd \
+#             --output-dir _pkg
+#       - name: Notarize and staple
+#         env:
+#           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+#           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+#           ASC_PRIVATE_KEY_B64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
+#           ASC_BYPASS_KEYCHAIN: "true"
+#         run: |
+#           ditto -c -k --keepParent _pkg "$RUNNER_TEMP/drippu-macos-notarization.zip"
+#           asc notarization submit \
+#             --file "$RUNNER_TEMP/drippu-macos-notarization.zip" \
+#             --wait
+#           xcrun stapler staple _pkg/drippu.app
+#           xcrun stapler validate _pkg/drippu.app
+#           spctl --assess --type execute --verbose=2 _pkg/drippu.app
+#           tar -czf drippu-macos-arm64.tar.gz -C _pkg .
       - name: Verify packaged macOS application and dependencies
         run: python3 .github/scripts/verify_release_artifacts.py desktop --platform macos --archive drippu-macos-arm64.tar.gz
       - name: Remove signing keychain
@@ -259,325 +263,327 @@ jobs:
             drippu-macos-arm64.tar.gz
             toolchain.txt
 
-  build-freebsd:
-    name: FreeBSD
-    needs: check
-    if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-      - name: Init submodules
-        run: |
-          git -c submodule."externals/ownfoil".update=none -c submodule."externals/nxdumptool".update=none -c submodule."externals/nxapi".update=none -c submodule."externals/nx-optimizer".update=none submodule update --init --recursive --depth=1
-      - uses: vmactions/freebsd-vm@v1
-        with:
-          usesh: true
-          prepare: |
-            pkg install -y cmake ninja qt6-base qt6-charts qt6-svg qt6-multimedia openssl pulseaudio vulkan-headers pkgconf libX11 libXext libXrandr libXScrnSaver wayland wayland-protocols libdecor mesa-libs evdev-proto glslang ffmpeg boost-all
-          run: |
-            cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_QT=ON \
-              -DYUZU_USE_BUNDLED_QT=OFF \
-              -DVulkanHeaders_FORCE_BUNDLED=ON \
-              -DVulkanUtilityLibraries_FORCE_BUNDLED=ON \
-              -GNinja
-            cmake --build build --target suyu suyu-cmd -j4
-            rm -rf _pkg && mkdir _pkg
-            cp build/bin/suyu _pkg/drippu
-            cp build/bin/suyu-cmd _pkg/drippu-cmd
-            ldd _pkg/drippu _pkg/drippu-cmd | tee freebsd-dependencies.txt
-            ! grep -q 'not found' freebsd-dependencies.txt
-            tar -czf drippu-freebsd-x64.tar.gz -C _pkg .
-            {
-              printf 'commit=%s\n' "$GITHUB_SHA"
-              printf 'runner_os=FreeBSD\nrunner_arch=%s\njob=build-freebsd\n' "$(uname -m)"
-              cmake --version
-              printf 'compiler=c++\n'
-              c++ --version
-            } > toolchain.txt
-      - uses: actions/upload-artifact@v7
-        with:
-          name: freebsd
-          path: |
-            drippu-freebsd-x64.tar.gz
-            toolchain.txt
-
-  build-android:
-    name: Android
-    needs: check
-    if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-      - name: Init submodules
-        run: |
-          git -c submodule."externals/ownfoil".update=none -c submodule."externals/nxdumptool".update=none -c submodule."externals/nxapi".update=none -c submodule."externals/nx-optimizer".update=none submodule update --init --recursive --depth=1
-      - uses: actions/setup-java@v6
-        with:
-          distribution: microsoft
-          java-version: "17"
-      - name: Install native deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build glslang-tools
-      - name: Set up release keystore
-        env:
-          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
-        run: |
-          if [ -z "$ANDROID_KEYSTORE_B64" ] || [ -z "$ANDROID_KEY_ALIAS" ] || [ -z "$ANDROID_KEYSTORE_PASS" ]; then
-            echo "::error::Android release signing requires ANDROID_KEYSTORE_B64, ANDROID_KEY_ALIAS, and ANDROID_KEYSTORE_PASS."
-            exit 1
-          fi
-          printf '%s' "$ANDROID_KEYSTORE_B64" | base64 --decode > "$GITHUB_WORKSPACE/release.p12"
-          echo "ANDROID_KEYSTORE_FILE=$GITHUB_WORKSPACE/release.p12" >> "$GITHUB_ENV"
-      - name: Build APKs
-        working-directory: src/android
-        env:
-          ANDROID_KEYSTORE_FILE: ${{ env.ANDROID_KEYSTORE_FILE }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleLegacyRelease assembleMainlineRelease assembleChromeOSRelease assembleGenshinSpoofRelease --stacktrace
-      - name: Collect APKs
-        run: |
-          rm -rf _pkg && mkdir _pkg
-          find src/android -name '*.apk' -exec cp {} _pkg/ \;
-      - name: Verify packaged Android APKs
-        run: |
-          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)
-          DEBUG_CERT="9D09B2001BE0DDE93EA0444C536B72270FAB3EB1A2FCCFD56E1A3C46CC0D7AF1"
-          for apk in _pkg/*.apk; do
-            python3 .github/scripts/verify_release_artifacts.py apk --platform android --archive "$apk"
-            "$APKSIGNER" verify "$apk"
-            CERT=$("$APKSIGNER" verify --print-certs "$apk" | grep -i "SHA-256" | tr -d ':' | tr '[:lower:]' '[:upper:]')
-            echo "$apk certs: $CERT"
-            case "$CERT" in
-              *"$DEBUG_CERT"*)
-                echo "::error::$apk is signed with the debug key and cannot be distributed."
-                exit 1
-                ;;
-            esac
-          done
-      - name: Remove release keystore
-        if: ${{ always() }}
-        run: |
-          if [ -n "${ANDROID_KEYSTORE_FILE:-}" ]; then
-            rm -f -- "$ANDROID_KEYSTORE_FILE"
-          fi
-      - name: Record toolchain
-        run: bash .github/scripts/write_toolchain.sh toolchain.txt
-      - uses: actions/upload-artifact@v7
-        with:
-          name: android
-          path: |
-            _pkg/*.apk
-            toolchain.txt
-
-  build-libretro:
-    name: Libretro
-    needs: check
-    if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-      - name: Init submodules
-        run: |
-          git -c submodule."externals/ownfoil".update=none -c submodule."externals/nxdumptool".update=none -c submodule."externals/nxapi".update=none -c submodule."externals/nx-optimizer".update=none submodule update --init --recursive --depth=1
-      - name: Install deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build glslang-tools \
-            libssl-dev libusb-1.0-0-dev libvulkan-dev \
-            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev \
-            libxfixes-dev libxss-dev libxkbcommon-dev libxtst-dev \
-            libwayland-dev libwayland-egl1 wayland-protocols libdecor-0-dev \
-            libegl-dev libdrm-dev libgbm-dev libpulse-dev \
-            libavcodec-dev libavfilter-dev libavutil-dev libswscale-dev \
-            libboost-all-dev
-      - name: ccache
-        uses: hendrikmuhs/ccache-action@v1.2.24
-        with:
-          key: ${{ runner.os }}-release-libretro
-          max-size: 2G
-      - name: Configure
-        run: |
-          cmake --version
-          set -o pipefail
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DSUYU_BUILD_LIBRETRO_CORE=ON -DENABLE_QT=OFF -DUSE_CCACHE=ON -GNinja 2>&1 | tee cmake_configure.log
-      - name: Upload cmake log
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: cmake-log-libretro
-          path: cmake_configure.log
-      - name: Build
-        run: cmake --build build --target suyu_libretro -j4
-      - name: Package
-        run: |
-          rm -rf _pkg && mkdir _pkg
-          find build -name 'suyu_libretro.so' -exec cp {} _pkg/ \;
-          tar -czf drippu-libretro-core-linux-x64.tar.gz -C _pkg .
-      - name: Verify packaged Linux libretro core and API
-        run: python3 .github/scripts/verify_release_artifacts.py libretro --platform linux --archive drippu-libretro-core-linux-x64.tar.gz
-      - name: Record toolchain
-        run: bash .github/scripts/write_toolchain.sh toolchain.txt
-      - uses: actions/upload-artifact@v7
-        with:
-          name: libretro
-          path: |
-            drippu-libretro-core-linux-x64.tar.gz
-            toolchain.txt
-
-  build-libretro-windows:
-    name: Libretro Windows
-    needs: check
-    if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Init submodules
-        run: |
-          git -c submodule."externals/ownfoil".update=none -c submodule."externals/nxdumptool".update=none -c submodule."externals/nxapi".update=none -c submodule."externals/nx-optimizer".update=none submodule update --init --recursive --depth=1
-      - uses: ilammy/msvc-dev-cmd@v1
-      - name: Install Vulkan SDK
-        shell: pwsh
-        run: |
-          choco install vulkan-sdk -y --no-progress
-          $sdkDir = Get-ChildItem C:\VulkanSDK -Directory | Sort-Object Name -Descending | Select-Object -First 1
-          echo "VULKAN_SDK=$($sdkDir.FullName)" >> $env:GITHUB_ENV
-          echo "$($sdkDir.FullName)\Bin" >> $env:GITHUB_PATH
-      - name: sccache
-        uses: hendrikmuhs/ccache-action@v1.2.24
-        with:
-          variant: sccache
-          key: ${{ runner.os }}-release-libretro-windows
-          max-size: 2G
-      - name: Configure
-        shell: bash
-        run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DSUYU_BUILD_LIBRETRO_CORE=ON -DENABLE_QT=OFF -DUSE_CCACHE=ON -DCCACHE_PATH=sccache -GNinja 2>&1 | tee cmake_configure.log
-          test ${PIPESTATUS[0]} -eq 0
-      - name: Upload cmake log
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: cmake-log-libretro-windows
-          path: cmake_configure.log
-      - name: Build
-        run: cmake --build build --target suyu_libretro -j4
-      - name: Package
-        shell: pwsh
-        run: |
-          Remove-Item -Recurse -Force _pkg -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory _pkg | Out-Null
-          Get-ChildItem build -Recurse -Filter '*.dll' | ForEach-Object { Copy-Item $_.FullName _pkg/ -Force }
-          Compress-Archive -Path _pkg/* -DestinationPath drippu-libretro-core-windows-x64.zip
-      - name: Verify packaged Windows libretro core and API
-        shell: pwsh
-        run: python .github/scripts/verify_release_artifacts.py libretro --platform windows --archive drippu-libretro-core-windows-x64.zip
-      - name: Record toolchain
-        shell: bash
-        run: bash .github/scripts/write_toolchain.sh toolchain.txt
-      - uses: actions/upload-artifact@v7
-        with:
-          name: libretro-windows
-          path: |
-            drippu-libretro-core-windows-x64.zip
-            toolchain.txt
-
-  build-libretro-android:
-    name: Libretro Android
-    needs: check
-    if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-      - name: Init submodules
-        run: |
-          git -c submodule."externals/ownfoil".update=none -c submodule."externals/nxdumptool".update=none -c submodule."externals/nxapi".update=none -c submodule."externals/nx-optimizer".update=none submodule update --init --recursive --depth=1
-      - name: Install native deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build glslang-tools
-      - name: Install Android NDK
-        run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;28.2.13676358" > /dev/null
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
-      - name: ccache
-        uses: hendrikmuhs/ccache-action@v1.2.24
-        with:
-          key: ${{ runner.os }}-release-libretro-android
-          max-size: 2G
-      - name: Configure
-        run: |
-          set -o pipefail
-          cmake -B build \
-            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
-            -DANDROID_ABI=arm64-v8a \
-            -DANDROID_PLATFORM=android-26 \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DSUYU_BUILD_LIBRETRO_CORE=ON -DENABLE_QT=OFF -DUSE_CCACHE=ON -GNinja 2>&1 | tee cmake_configure.log
-      - name: Upload cmake log
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: cmake-log-libretro-android
-          path: cmake_configure.log
-      - name: Build
-        run: cmake --build build --target suyu_libretro -j4
-      - name: Package
-        run: |
-          rm -rf _pkg && mkdir _pkg
-          find build -name '*suyu_libretro*.so' -exec cp {} _pkg/suyu_libretro_android_arm64-v8a.so \;
-          tar -czf drippu-libretro-core-android-arm64.tar.gz -C _pkg .
-      - name: Verify packaged Android libretro core archive
-        run: |
-          test "$(tar -tzf drippu-libretro-core-android-arm64.tar.gz | grep -c '\.so$')" -ge 1
-      - name: Record toolchain
-        run: bash .github/scripts/write_toolchain.sh toolchain.txt
-      - uses: actions/upload-artifact@v7
-        with:
-          name: libretro-android
-          path: |
-            drippu-libretro-core-android-arm64.tar.gz
-            toolchain.txt
-
-  release:
-    name: Publish Release
-    needs:
-      [
-        build-windows,
-        build-linux,
-        build-macos,
-        build-freebsd,
-        build-android,
-        build-libretro,
-        build-libretro-windows,
-        build-libretro-android,
-      ]
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          path: artifacts
-      - name: Compute release tag
-        id: release
-        run: |
-          version="${{ inputs.release_version || 'v0.0.5' }}"
-          echo "tag=${version}-$(date -u +%Y%m%d)-${GITHUB_SHA:0:12}" >> "$GITHUB_OUTPUT"
-      - name: Create release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ steps.release.outputs.tag }}
-          name: drippu ${{ inputs.release_version || 'v0.0.5' }} automated build
-          target_commitish: ${{ github.sha }}
-          prerelease: true
-          generate_release_notes: true
-          fail_on_unmatched_files: true
-          files: |
-            artifacts/**/*.zip
-            artifacts/**/*.tar.gz
-            artifacts/**/*.AppImage
-            artifacts/**/*.apk
+#   build-freebsd:
+#     name: FreeBSD
+#     needs: check
+#     if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
+#     runs-on: ubuntu-24.04
+#     steps:
+#       - uses: actions/checkout@v7
+#       - name: Init submodules
+#         run: |
+#           git -c submodule."externals/ownfoil".update=none -c submodule."externals/nxdumptool".update=none -c submodule."externals/nxapi".update=none -c submodule."externals/nx-optimizer".update=none submodule update --init --recursive --depth=1
+#       - uses: vmactions/freebsd-vm@v1
+#         with:
+#           usesh: true
+#           prepare: |
+#             pkg install -y cmake ninja qt6-base qt6-charts qt6-svg qt6-multimedia openssl pulseaudio vulkan-headers pkgconf libX11 libXext libXrandr libXScrnSaver wayland wayland-protocols libdecor mesa-libs evdev-proto glslang ffmpeg boost-all
+#           run: |
+#             cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_QT=ON \
+#               -DYUZU_USE_BUNDLED_QT=OFF \
+#               -DVulkanHeaders_FORCE_BUNDLED=ON \
+#               -DVulkanUtilityLibraries_FORCE_BUNDLED=ON \
+#               -GNinja
+#             cmake --build build --target suyu suyu-cmd -j4
+#             rm -rf _pkg && mkdir _pkg
+#             cp build/bin/suyu _pkg/drippu
+#             cp build/bin/suyu-cmd _pkg/drippu-cmd
+#             ldd _pkg/drippu _pkg/drippu-cmd | tee freebsd-dependencies.txt
+#             ! grep -q 'not found' freebsd-dependencies.txt
+#             tar -czf drippu-freebsd-x64.tar.gz -C _pkg .
+#             {
+#               printf 'commit=%s\n' "$GITHUB_SHA"
+#               printf 'runner_os=FreeBSD\nrunner_arch=%s\njob=build-freebsd\n' "$(uname -m)"
+#               cmake --version
+#               printf 'compiler=c++\n'
+#               c++ --version
+#             } > toolchain.txt
+#       - uses: actions/upload-artifact@v7
+#         with:
+#           name: freebsd
+#           path: |
+#             drippu-freebsd-x64.tar.gz
+#             toolchain.txt
+# 
+#   build-android:
+#     name: Android
+#     needs: check
+#     if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
+#     runs-on: ubuntu-24.04
+#     steps:
+#       - uses: actions/checkout@v7
+#       - name: Init submodules
+#         run: |
+#           git -c submodule."externals/ownfoil".update=none -c submodule."externals/nxdumptool".update=none -c submodule."externals/nxapi".update=none -c submodule."externals/nx-optimizer".update=none submodule update --init --recursive --depth=1
+#       - uses: actions/setup-java@v6
+#         with:
+#           distribution: microsoft
+#           java-version: "17"
+#       - name: Install native deps
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y ninja-build glslang-tools
+#       - name: Set up release keystore
+#         env:
+#           ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+#           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+#           ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+#         run: |
+#           if [ -z "$ANDROID_KEYSTORE_B64" ] || [ -z "$ANDROID_KEY_ALIAS" ] || [ -z "$ANDROID_KEYSTORE_PASS" ]; then
+#             echo "::error::Android release signing requires ANDROID_KEYSTORE_B64, ANDROID_KEY_ALIAS, and ANDROID_KEYSTORE_PASS."
+#             exit 1
+#           fi
+#           printf '%s' "$ANDROID_KEYSTORE_B64" | base64 --decode > "$GITHUB_WORKSPACE/release.p12"
+#           echo "ANDROID_KEYSTORE_FILE=$GITHUB_WORKSPACE/release.p12" >> "$GITHUB_ENV"
+#       - name: Build APKs
+#         working-directory: src/android
+#         env:
+#           ANDROID_KEYSTORE_FILE: ${{ env.ANDROID_KEYSTORE_FILE }}
+#           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+#           ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+#         run: |
+#           chmod +x gradlew
+#           ./gradlew assembleLegacyRelease assembleMainlineRelease assembleChromeOSRelease assembleGenshinSpoofRelease --stacktrace
+#       - name: Collect APKs
+#         run: |
+#           rm -rf _pkg && mkdir _pkg
+#           find src/android -name '*.apk' -exec cp {} _pkg/ \;
+#       - name: Verify packaged Android APKs
+#         run: |
+#           APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)
+#           DEBUG_CERT="9D09B2001BE0DDE93EA0444C536B72270FAB3EB1A2FCCFD56E1A3C46CC0D7AF1"
+#           for apk in _pkg/*.apk; do
+#             python3 .github/scripts/verify_release_artifacts.py apk --platform android --archive "$apk"
+#             "$APKSIGNER" verify "$apk"
+#             CERT=$("$APKSIGNER" verify --print-certs "$apk" | grep -i "SHA-256" | tr -d ':' | tr '[:lower:]' '[:upper:]')
+#             echo "$apk certs: $CERT"
+#             case "$CERT" in
+#               *"$DEBUG_CERT"*)
+#                 echo "::error::$apk is signed with the debug key and cannot be distributed."
+#                 exit 1
+#                 ;;
+#             esac
+#           done
+#       - name: Remove release keystore
+#         if: ${{ always() }}
+#         run: |
+#           if [ -n "${ANDROID_KEYSTORE_FILE:-}" ]; then
+#             rm -f -- "$ANDROID_KEYSTORE_FILE"
+#           fi
+#       - name: Record toolchain
+#         run: bash .github/scripts/write_toolchain.sh toolchain.txt
+#       - uses: actions/upload-artifact@v7
+#         with:
+#           name: android
+#           path: |
+#             _pkg/*.apk
+#             toolchain.txt
+# 
+#   build-libretro:
+#     name: Libretro
+#     needs: check
+#     if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
+#     runs-on: ubuntu-24.04
+#     steps:
+#       - uses: actions/checkout@v7
+#       - name: Init submodules
+#         run: |
+#           git -c submodule."externals/ownfoil".update=none -c submodule."externals/nxdumptool".update=none -c submodule."externals/nxapi".update=none -c submodule."externals/nx-optimizer".update=none submodule update --init --recursive --depth=1
+#       - name: Install deps
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y ninja-build glslang-tools \
+#             libssl-dev libusb-1.0-0-dev libvulkan-dev \
+#             libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev \
+#             libxfixes-dev libxss-dev libxkbcommon-dev libxtst-dev \
+#             libwayland-dev libwayland-egl1 wayland-protocols libdecor-0-dev \
+#             libegl-dev libdrm-dev libgbm-dev libpulse-dev \
+#             libavcodec-dev libavfilter-dev libavutil-dev libswscale-dev \
+#             libboost-all-dev
+#       - name: ccache
+#         uses: hendrikmuhs/ccache-action@v1.2.24
+#         with:
+#           key: ${{ runner.os }}-release-libretro
+#           max-size: 2G
+#       - name: Configure
+#         run: |
+#           cmake --version
+#           set -o pipefail
+#           cmake -B build -DCMAKE_BUILD_TYPE=Release -DSUYU_BUILD_LIBRETRO_CORE=ON -DENABLE_QT=OFF -DUSE_CCACHE=ON -GNinja 2>&1 | tee cmake_configure.log
+#       - name: Upload cmake log
+#         if: failure()
+#         uses: actions/upload-artifact@v7
+#         with:
+#           name: cmake-log-libretro
+#           path: cmake_configure.log
+#       - name: Build
+#         run: cmake --build build --target suyu_libretro -j4
+#       - name: Package
+#         run: |
+#           rm -rf _pkg && mkdir _pkg
+#           find build -name 'suyu_libretro.so' -exec cp {} _pkg/ \;
+#           tar -czf drippu-libretro-core-linux-x64.tar.gz -C _pkg .
+#       - name: Verify packaged Linux libretro core and API
+#         run: python3 .github/scripts/verify_release_artifacts.py libretro --platform linux --archive drippu-libretro-core-linux-x64.tar.gz
+#       - name: Record toolchain
+#         run: bash .github/scripts/write_toolchain.sh toolchain.txt
+#       - uses: actions/upload-artifact@v7
+#         with:
+#           name: libretro
+#           path: |
+#             drippu-libretro-core-linux-x64.tar.gz
+#             toolchain.txt
+# 
+#   build-libretro-windows:
+#     name: Libretro Windows
+#     needs: check
+#     if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
+#     runs-on: windows-latest
+#     steps:
+#       - uses: actions/checkout@v7
+#       - name: Init submodules
+#         run: |
+#           git -c submodule."externals/ownfoil".update=none -c submodule."externals/nxdumptool".update=none -c submodule."externals/nxapi".update=none -c submodule."externals/nx-optimizer".update=none submodule update --init --recursive --depth=1
+#       - uses: ilammy/msvc-dev-cmd@v1
+#       - name: Install Vulkan SDK
+#         shell: pwsh
+#         run: |
+#           choco install vulkan-sdk -y --no-progress
+#           $sdkDir = Get-ChildItem C:\VulkanSDK -Directory | Sort-Object Name -Descending | Select-Object -First 1
+#           echo "VULKAN_SDK=$($sdkDir.FullName)" >> $env:GITHUB_ENV
+#           echo "$($sdkDir.FullName)\Bin" >> $env:GITHUB_PATH
+#       - name: sccache
+#         uses: hendrikmuhs/ccache-action@v1.2.24
+#         with:
+#           variant: sccache
+#           key: ${{ runner.os }}-release-libretro-windows
+#           max-size: 2G
+#       - name: Configure
+#         shell: bash
+#         run: |
+#           cmake -B build -DCMAKE_BUILD_TYPE=Release -DSUYU_BUILD_LIBRETRO_CORE=ON -DENABLE_QT=OFF -DUSE_CCACHE=ON -DCCACHE_PATH=sccache -GNinja 2>&1 | tee cmake_configure.log
+#           test ${PIPESTATUS[0]} -eq 0
+#       - name: Upload cmake log
+#         if: failure()
+#         uses: actions/upload-artifact@v7
+#         with:
+#           name: cmake-log-libretro-windows
+#           path: cmake_configure.log
+#       - name: Build
+#         run: cmake --build build --target suyu_libretro -j4
+#       - name: Package
+#         shell: pwsh
+#         run: |
+#           Remove-Item -Recurse -Force _pkg -ErrorAction SilentlyContinue
+#           New-Item -ItemType Directory _pkg | Out-Null
+#           Get-ChildItem build -Recurse -Filter '*.dll' | ForEach-Object { Copy-Item $_.FullName _pkg/ -Force }
+#           Compress-Archive -Path _pkg/* -DestinationPath drippu-libretro-core-windows-x64.zip
+#       - name: Verify packaged Windows libretro core and API
+#         shell: pwsh
+#         run: python .github/scripts/verify_release_artifacts.py libretro --platform windows --archive drippu-libretro-core-windows-x64.zip
+#       - name: Record toolchain
+#         shell: bash
+#         run: bash .github/scripts/write_toolchain.sh toolchain.txt
+#       - uses: actions/upload-artifact@v7
+#         with:
+#           name: libretro-windows
+#           path: |
+#             drippu-libretro-core-windows-x64.zip
+#             toolchain.txt
+# 
+#   build-libretro-android:
+#     name: Libretro Android
+#     needs: check
+#     if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
+#     runs-on: ubuntu-24.04
+#     steps:
+#       - uses: actions/checkout@v7
+#       - name: Init submodules
+#         run: |
+#           git -c submodule."externals/ownfoil".update=none -c submodule."externals/nxdumptool".update=none -c submodule."externals/nxapi".update=none -c submodule."externals/nx-optimizer".update=none submodule update --init --recursive --depth=1
+#       - name: Install native deps
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y ninja-build glslang-tools
+#       - name: Install Android NDK
+#         run: |
+#           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;28.2.13676358" > /dev/null
+#           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
+#       - name: ccache
+#         uses: hendrikmuhs/ccache-action@v1.2.24
+#         with:
+#           key: ${{ runner.os }}-release-libretro-android
+#           max-size: 2G
+#       - name: Configure
+#         run: |
+#           set -o pipefail
+#           cmake -B build \
+#             -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
+#             -DANDROID_ABI=arm64-v8a \
+#             -DANDROID_PLATFORM=android-26 \
+#             -DCMAKE_BUILD_TYPE=Release \
+#             -DSUYU_BUILD_LIBRETRO_CORE=ON -DENABLE_QT=OFF -DUSE_CCACHE=ON -GNinja 2>&1 | tee cmake_configure.log
+#       - name: Upload cmake log
+#         if: failure()
+#         uses: actions/upload-artifact@v7
+#         with:
+#           name: cmake-log-libretro-android
+#           path: cmake_configure.log
+#       - name: Build
+#         run: cmake --build build --target suyu_libretro -j4
+#       - name: Package
+#         run: |
+#           rm -rf _pkg && mkdir _pkg
+#           find build -name '*suyu_libretro*.so' -exec cp {} _pkg/suyu_libretro_android_arm64-v8a.so \;
+#           tar -czf drippu-libretro-core-android-arm64.tar.gz -C _pkg .
+#       - name: Verify packaged Android libretro core archive
+#         run: |
+#           test "$(tar -tzf drippu-libretro-core-android-arm64.tar.gz | grep -c '\.so$')" -ge 1
+#       - name: Record toolchain
+#         run: bash .github/scripts/write_toolchain.sh toolchain.txt
+#       - uses: actions/upload-artifact@v7
+#         with:
+#           name: libretro-android
+#           path: |
+#             drippu-libretro-core-android-arm64.tar.gz
+#             toolchain.txt
+# 
+  # Temporarily disabled so pushes to fix-macos-build exercise the build
+  # matrix (macOS) without publishing a release.
+  # release:
+  #   name: Publish Release
+  #   needs:
+  #     [
+  #       build-windows,
+  #       build-linux,
+  #       build-macos,
+  #       build-freebsd,
+  #       build-android,
+  #       build-libretro,
+  #       build-libretro-windows,
+  #       build-libretro-android,
+  #     ]
+  #   runs-on: ubuntu-24.04
+  #   steps:
+  #     - uses: actions/download-artifact@v8
+  #       with:
+  #         path: artifacts
+  #     - name: Compute release tag
+  #       id: release
+  #       run: |
+  #         version="${{ inputs.release_version || 'v0.0.5' }}"
+  #         echo "tag=${version}-$(date -u +%Y%m%d)-${GITHUB_SHA:0:12}" >> "$GITHUB_OUTPUT"
+  #     - name: Create release
+  #       uses: softprops/action-gh-release@v3
+  #       with:
+  #         tag_name: ${{ steps.release.outputs.tag }}
+  #         name: drippu ${{ inputs.release_version || 'v0.0.5' }} automated build
+  #         target_commitish: ${{ github.sha }}
+  #         prerelease: true
+  #         generate_release_notes: true
+  #         fail_on_unmatched_files: true
+  #         files: |
+  #           artifacts/**/*.zip
+  #           artifacts/**/*.tar.gz
+  #           artifacts/**/*.AppImage
+  #           artifacts/**/*.apk
