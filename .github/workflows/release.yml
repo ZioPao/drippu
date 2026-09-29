@@ -174,7 +174,6 @@ jobs:
             -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
             -DCMAKE_PREFIX_PATH="$(brew --prefix qt@6);$(brew --prefix openssl);$(brew --prefix ffmpeg);$(brew --prefix libusb);$(brew --prefix enet);$(brew --prefix sdl3)" \
             -DVulkanHeaders_FORCE_BUNDLED=ON \
-            -DYUZU_TESTS=ON \
             -DYUZU_USE_BUNDLED_MOLTENVK=OFF 2>&1 | tee cmake_configure.log
           test ${PIPESTATUS[0]} -eq 0
       - name: Upload cmake log
@@ -183,10 +182,11 @@ jobs:
         with:
           name: cmake-log-macos
           path: cmake_configure.log
+      # Tests are compiled and run in tests.yml (Linux + macOS). Keeping the
+      # test suite out of the release build avoids test-only compile errors
+      # surfacing only in the macOS release job.
       - name: Build
-        run: cmake --build build --target suyu suyu-cmd tests macos_moltenvk_smoke -j4
-      - name: Run tests
-        run: ctest --test-dir build --output-on-failure
+        run: cmake --build build --target suyu suyu-cmd macos_moltenvk_smoke -j4
       - name: Run MoltenVK / CAMetalLayer smoke
         timeout-minutes: 5
         env:
