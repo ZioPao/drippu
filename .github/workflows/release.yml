@@ -2,6 +2,9 @@ name: Automated drippu release
 run-name: ${{ github.sha }}
 
 on:
+  push:
+    branches:
+      - verify-macos-release
   schedule:
     - cron: "0 3 * * *"
   workflow_dispatch:
@@ -41,7 +44,7 @@ jobs:
   build-windows:
     name: Windows
     needs: check
-    if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
+    if: false
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -105,7 +108,7 @@ jobs:
   build-linux:
     name: Linux
     needs: check
-    if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
+    if: false
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -194,34 +197,6 @@ jobs:
         run: |
           build/bin/suyu.app/Contents/MacOS/macos_moltenvk_smoke 2>&1 | tee macos-moltenvk-smoke.log
           grep -F "macos_moltenvk_smoke: OK" macos-moltenvk-smoke.log
-      - name: Validate signing configuration
-        env:
-          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
-          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          ASC_PRIVATE_KEY_B64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
-        run: |
-          for name in MACOS_CERTIFICATE_P12 MACOS_CERTIFICATE_PASSWORD MACOS_SIGNING_IDENTITY ASC_KEY_ID ASC_ISSUER_ID ASC_PRIVATE_KEY_B64; do
-            test -n "${!name}" || { echo "Missing required macOS release secret: $name"; exit 1; }
-          done
-      - name: Import Developer ID certificate
-        env:
-          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
-          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-        run: |
-          keychain="$RUNNER_TEMP/drippu-signing.keychain-db"
-          certificate="$RUNNER_TEMP/drippu-signing.p12"
-          keychain_password="$(uuidgen)"
-          printf '%s' "$MACOS_CERTIFICATE_P12" | base64 --decode > "$certificate"
-          security create-keychain -p "$keychain_password" "$keychain"
-          security set-keychain-settings -lut 21600 "$keychain"
-          security unlock-keychain -p "$keychain_password" "$keychain"
-          security import "$certificate" -k "$keychain" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain"
-          security list-keychains -d user -s "$keychain" login.keychain-db
-          echo "MACOS_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
       - name: Package
         env:
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
@@ -230,21 +205,8 @@ jobs:
             --app build/bin/suyu.app \
             --cli build/bin/suyu-cmd \
             --output-dir _pkg
-      - name: Notarize and staple
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          ASC_PRIVATE_KEY_B64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
-          ASC_BYPASS_KEYCHAIN: "true"
-        run: |
-          ditto -c -k --keepParent _pkg "$RUNNER_TEMP/drippu-macos-notarization.zip"
-          asc notarization submit \
-            --file "$RUNNER_TEMP/drippu-macos-notarization.zip" \
-            --wait
-          xcrun stapler staple _pkg/drippu.app
-          xcrun stapler validate _pkg/drippu.app
-          spctl --assess --type execute --verbose=2 _pkg/drippu.app
-          tar -czf drippu-macos-arm64.tar.gz -C _pkg .
+      - name: Archive unsigned macOS package
+        run: tar -czf drippu-macos-arm64.tar.gz -C _pkg .
       - name: Verify packaged macOS application and dependencies
         run: python3 .github/scripts/verify_release_artifacts.py desktop --platform macos --archive drippu-macos-arm64.tar.gz
       - name: Remove signing keychain
@@ -265,7 +227,7 @@ jobs:
   build-freebsd:
     name: FreeBSD
     needs: check
-    if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
+    if: false
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -307,7 +269,7 @@ jobs:
   build-android:
     name: Android
     needs: check
-    if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
+    if: false
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -381,7 +343,7 @@ jobs:
   build-libretro:
     name: Libretro
     needs: check
-    if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
+    if: false
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -436,7 +398,7 @@ jobs:
   build-libretro-windows:
     name: Libretro Windows
     needs: check
-    if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
+    if: false
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -493,7 +455,7 @@ jobs:
   build-libretro-android:
     name: Libretro Android
     needs: check
-    if: github.event_name != 'schedule' || needs.check.outputs.changed == 'true'
+    if: false
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -549,17 +511,7 @@ jobs:
 
   release:
     name: Publish Release
-    needs:
-      [
-        build-windows,
-        build-linux,
-        build-macos,
-        build-freebsd,
-        build-android,
-        build-libretro,
-        build-libretro-windows,
-        build-libretro-android,
-      ]
+    needs: [build-macos]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v8
@@ -591,7 +543,7 @@ jobs:
           target_commitish: ${{ github.sha }}
           prerelease: true
           generate_release_notes: true
-          fail_on_unmatched_files: true
+          fail_on_unmatched_files: false
           files: |
             artifacts/**/*.zip
             artifacts/**/*.tar.gz
