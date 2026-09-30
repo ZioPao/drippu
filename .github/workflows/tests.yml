@@ -5,7 +5,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  workflow_call:
 
 jobs:
   tests:
@@ -120,6 +119,7 @@ jobs:
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_QT=OFF -DYUZU_TESTS=ON -DYUZU_CMD=OFF -GNinja \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
             -DCMAKE_PREFIX_PATH="$(brew --prefix openssl);$(brew --prefix ffmpeg);$(brew --prefix libusb);$(brew --prefix enet);$(brew --prefix sdl3)" 2>&1 | tee cmake_configure.log
+          test ${PIPESTATUS[0]} -eq 0
       - name: Upload cmake log
         if: failure()
         uses: actions/upload-artifact@v7

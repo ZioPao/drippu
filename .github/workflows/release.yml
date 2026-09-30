@@ -192,8 +192,26 @@ jobs:
           XDG_CONFIG_HOME: ${{ runner.temp }}/drippu-smoke/config
           XDG_CACHE_HOME: ${{ runner.temp }}/drippu-smoke/cache
         run: |
-          build/bin/suyu.app/Contents/MacOS/macos_moltenvk_smoke 2>&1 | tee macos-moltenvk-smoke.log
+          set -euo pipefail
+          unset LIBVULKAN_PATH || true
+          APP="build/bin/suyu.app"
+          MVK="$APP/Contents/Frameworks/libMoltenVK.dylib"
+          SMOKE="$APP/Contents/MacOS/macos_moltenvk_smoke"
+          test -d "$APP"
+          test -f "$MVK"
+          test -x "$SMOKE"
+          echo "bundle MoltenVK: $MVK"
+          ls -l "$MVK" "$SMOKE"
+          "$SMOKE" 2>&1 | tee macos-moltenvk-smoke.log
+          grep -F "macos_moltenvk_smoke: CAMetalLayer ok" macos-moltenvk-smoke.log
+          grep -F "macos_moltenvk_smoke: Vulkan surface ok" macos-moltenvk-smoke.log
+          grep -F "macos_moltenvk_smoke: driver=MoltenVK" macos-moltenvk-smoke.log
+          grep -F "macos_moltenvk_smoke: device ok" macos-moltenvk-smoke.log
+          grep -F "macos_moltenvk_smoke: swapchain ok" macos-moltenvk-smoke.log
           grep -F "macos_moltenvk_smoke: OK" macos-moltenvk-smoke.log
+          if grep -F "macos_moltenvk_smoke: FAIL" macos-moltenvk-smoke.log; then
+            exit 1
+          fi
       - name: Validate signing configuration
         env:
           MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
